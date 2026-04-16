@@ -181,6 +181,33 @@ def search_products(page, image_url: str) -> bool:
         return False
 
 
+def get_modal_price(page) -> int:
+    """モーダルの販売価格を取得（取得できなければ0を返す）"""
+    try:
+        modal = page.locator('[role="dialog"]')
+        # 販売価格フィールド（数値のinput）
+        for sel in ['input[placeholder="販売価格"]', 'input[name*="price"]', 'input[name*="Price"]']:
+            try:
+                el = modal.locator(sel).first
+                val = el.input_value(timeout=1000).strip().replace(',', '')
+                if val:
+                    return int(float(val))
+            except Exception:
+                continue
+        # セレクタが合わない場合はラベル「販売価格」の隣のinputを探す
+        try:
+            price_label = modal.locator('text=販売価格').first
+            price_input = price_label.locator('..').locator('input').first
+            val = price_input.input_value(timeout=1000).strip().replace(',', '')
+            if val:
+                return int(float(val))
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return 0
+
+
 def get_modal_supplier_url(page) -> str:
     try:
         modal = page.locator('[role="dialog"]')
@@ -411,6 +438,7 @@ def main():
     parser.add_argument("--csv",     default=str(DEFAULT_CSV))
     parser.add_argument("--no-filter", action="store_true", help="画像フィルタリングを無効化")
     parser.add_argument("--keyword", default="サコッシュ", help="Google画像検索キーワード")
+    parser.add_argument("--max-price", type=int, default=10000, help="販売価格上限（円）")
     args = parser.parse_args()
 
     logger.info(f"=== add_five.py 開始 | dry_run={args.dry_run} | 目標={args.count}件 ===")
@@ -489,6 +517,16 @@ def main():
                             logger.info(f"  [{i}] 新規商品 ({total_slides}枚) supplier_url={supplier_url[:60]}")
                             if norm_url:
                                 session_tried.add(norm_url)
+
+                            # 価格チェック（上限超えはスキップ）
+                            price = get_modal_price(page)
+                            if price > args.max_price:
+                                logger.info(f"  [{i}] 価格{price}円 > {args.max_price}円 → スキップ")
+                                page.keyboard.press("Escape")
+                                page.wait_for_timeout(500)
+                                continue
+                            if price > 0:
+                                logger.info(f"  [{i}] 価格チェックOK: {price}円")
 
                             found_new = True
 
