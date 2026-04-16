@@ -364,93 +364,77 @@ def try_add_product(page, concept: str, color: str, size: str, dry_run: bool) ->
     return False, "すべてのカテゴリで失敗"
 
 
-def get_google_image_urls(browser, keyword: str = "サコッシュ", max_count: int = 30) -> list:
-    """Google画像検索からURLリストを動的に取得する（別タブで実行）"""
-    logger.info(f"Google画像検索: 「{keyword}」でURL取得中...")
+URL_CACHE_FILE = Path("search_image_urls.txt")
+
+
+def load_cached_image_urls() -> list:
+    """キャッシュファイルからURLリストを読み込む"""
+    if not URL_CACHE_FILE.exists():
+        return []
+    urls = [line.strip() for line in URL_CACHE_FILE.read_text(encoding="utf-8").splitlines()
+            if line.strip() and line.strip().startswith("http")]
+    logger.info(f"キャッシュから {len(urls)} 件のURLを読み込みました: {URL_CACHE_FILE}")
+    return urls
+
+
+def save_image_urls_to_cache(urls: list) -> None:
+    """URLリストをキャッシュファイルに保存"""
+    URL_CACHE_FILE.write_text("\n".join(urls), encoding="utf-8")
+    logger.info(f"{len(urls)} 件のURLをキャッシュに保存: {URL_CACHE_FILE}")
+
+
+def fetch_bing_image_urls(browser, keyword: str = "サコッシュ", max_count: int = 50) -> list:
+    """Bing画像検索から画像URLを取得する（別タブで実行）"""
+    logger.info(f"Bing画像検索: 「{keyword}」でURL取得中...")
     urls = []
+    import json as _json
     gpage = browser.new_page(viewport={"width": 1280, "height": 900})
     try:
         gpage.goto(
-            f"https://www.google.com/search?q={keyword}&tbm=isch&hl=ja",
-            wait_until="networkidle"
+            f"https://www.bing.com/images/search?q={keyword}&form=HDRSC2",
+            wait_until="domcontentloaded"
         )
         gpage.wait_for_timeout(3000)
 
-        # 同意ページ対応
-        for btn_text in ["同意する", "Accept all", "すべて同意"]:
-            try:
-                btn = gpage.locator(f'button:has-text("{btn_text}")').first
-                if btn.is_visible(timeout=1000):
-                    btn.click()
-                    gpage.wait_for_timeout(1500)
-                    break
-            except Exception:
-                pass
+        # スクロールして追加画像をロード
+        for _ in range(3):
+            gpage.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            gpage.wait_for_timeout(1500)
 
-        # スクロールして画像をロード
-        gpage.evaluate("window.scrollTo(0, 400)")
-        gpage.wait_for_timeout(1500)
+        # Bingは a.iusc の m 属性にJSON形式でオリジナル画像URLが入っている
+        anchors = gpage.locator("a.iusc").all()
+        logger.info(f"  Bing画像アンカー数: {len(anchors)}")
 
-        # 複数セレクタを順番に試してサムネイルを取得
-        thumbs = []
-        for sel in [
-            'img.YQ4gaf',
-            'div[data-id] img',
-            'g-img img',
-            'img.rg_i',
-            '#islrg img',
-        ]:
-            found = gpage.locator(sel).all()
-            if found:
-                logger.info(f"  セレクタ「{sel}」で {len(found)} 件発見")
-                thumbs = found
+        for anchor in anchors:
+            if len(urls) >= max_count:
                 break
-
-        if not thumbs:
-            logger.warning("  サムネイルが見つかりません（スクリーンショット保存）")
             try:
-                gpage.screenshot(path="logs/google_debug.png")
+                m_attr = anchor.get_attribute("m") or ""
+                data = _json.loads(m_attr)
+                murl = data.get("murl", "")
+                if murl and murl.startswith("http") and murl not in urls:
+                    urls.append(murl)
+                    logger.info(f"  [{len(urls)}] {murl[:80]}")
+            except Exception:
+                continue
+
+        if not urls:
+            logger.warning("  URLが取得できませんでした（スクリーンショット保存）")
+            try:
+                gpage.screenshot(path="logs/bing_debug.png")
             except Exception:
                 pass
-        else:
-            for thumb in thumbs:
-                if len(urls) >= max_count:
-                    break
-                try:
-                    thumb.scroll_into_view_if_needed()
-                    thumb.click()
-                    gpage.wait_for_timeout(1000)
-                    # サイドパネルの大きい画像を取得
-                    for sel in [
-                        'img.iPVvYb', 'img.r48jcc',
-                        'img[jsname="kn3ccd"]', 'img[jsname="JuXqh"]',
-                        'img[jsname="n3VNCb"]',
-                    ]:
-                        try:
-                            big = gpage.locator(sel).first
-                            src = big.get_attribute('src') or ''
-                            if (src.startswith('http')
-                                    and 'google' not in src
-                                    and 'gstatic' not in src
-                                    and src not in urls):
-                                urls.append(src)
-                                logger.info(f"  [{len(urls)}] {src[:80]}")
-                                break
-                        except Exception:
-                            continue
-                except Exception:
-                    continue
 
     except Exception as e:
-        logger.warning(f"Google画像検索エラー: {e}")
+        logger.warning(f"Bing画像検索エラー: {e}")
         try:
-            gpage.screenshot(path="logs/google_error.png")
+            gpage.screenshot(path="logs/bing_error.png")
         except Exception:
             pass
     finally:
         gpage.close()
 
-    logger.info(f"Google画像URL取得完了: {len(urls)}件")
+    logger.info(f"Bing画像URL取得完了: {len(urls)}件")
     return urls
 
 
@@ -462,6 +446,7 @@ def main():
     parser.add_argument("--no-filter", action="store_true", help="画像フィルタリングを無効化")
     parser.add_argument("--keyword", default="サコッシュ", help="Google画像検索キーワード")
     parser.add_argument("--max-price", type=int, default=10000, help="販売価格上限（円）")
+    parser.add_argument("--refresh-urls", action="store_true", help="Bingから画像URLを再取得してキャッシュを更新")
     args = parser.parse_args()
 
     logger.info(f"=== add_five.py 開始 | dry_run={args.dry_run} | 目標={args.count}件 ===")
@@ -484,20 +469,29 @@ def main():
         try:
             login(page)
 
-            # Google画像検索でURLを動的取得
-            search_image_urls = get_google_image_urls(browser, keyword=args.keyword, max_count=30)
-            if not search_image_urls:
-                logger.error("Google画像URLが1件も取得できませんでした。終了します。")
-                return
+            # 画像URLの取得: キャッシュがあれば読み込み、なければBingから取得して保存
+            if args.refresh_urls or not URL_CACHE_FILE.exists():
+                logger.info("Bingから画像URLを取得してキャッシュに保存します...")
+                search_image_urls = fetch_bing_image_urls(browser, keyword=args.keyword, max_count=50)
+                if search_image_urls:
+                    save_image_urls_to_cache(search_image_urls)
+                else:
+                    logger.error("Bingから画像URLが取得できませんでした。終了します。")
+                    return
+            else:
+                search_image_urls = load_cached_image_urls()
+                if not search_image_urls:
+                    logger.error(f"キャッシュが空です: {URL_CACHE_FILE}  --refresh-urls で再取得してください。")
+                    return
 
-            logger.info(f"Google画像URLを {len(search_image_urls)} 件取得 → これだけを使って検索します")
+            logger.info(f"検索用画像URL: {len(search_image_urls)} 件")
 
             variant_idx = 0
             search_url_idx = 0
 
             while added_count < args.count:
                 if search_url_idx >= len(search_image_urls):
-                    logger.warning("Google画像URLをすべて試しましたが目標件数に届きませんでした")
+                    logger.warning("画像URLをすべて試しましたが目標件数に届きませんでした（--refresh-urls で再取得できます）")
                     break
 
                 search_url = search_image_urls[search_url_idx]
