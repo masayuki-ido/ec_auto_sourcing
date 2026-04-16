@@ -34,18 +34,6 @@ LOGS = Path("logs"); LOGS.mkdir(exist_ok=True)
 BASE = "https://sacoche-sacolla.flumo-admin-server.com"
 DEFAULT_CSV = Path.home() / "Downloads" / "item_sacoche-sacolla.csv"
 
-# ─── 検索に使う画像URL（多様な素材・毎回ローテーション） ───
-SEARCH_IMAGE_URLS = [
-    "https://fulmo-img-server.com/sacoche-sacolla/788f2d22-0fb6-43b9-bb9e-7cd8d2ffdf26.jpg",
-    "https://g-search1.alicdn.com/img/bao/uploaded/i4/i1/1049653664/O1CN01iPes6U1cw9q46zYvI_!!0-item_pic.jpg",
-    "https://g-search3.alicdn.com/img/bao/uploaded/i4/i2/2207984893161/O1CN01mO1jkz1MoApCiKNvP_!!2207984893161-0-lubanu-s.jpg",
-    "https://g-search2.alicdn.com/img/bao/uploaded/i4/i2/3481871984/O1CN01bQhGjE23kCTw5XEDF_!!3481871984-0-lubanu-s.jpg",
-    "https://g-search2.alicdn.com/img/bao/uploaded/i4/i1/2207991009063/O1CN01q9b2fU24vvWPQg4pt_!!2207991009063-0-lubanu-s.jpg",
-    "https://g-search3.alicdn.com/img/bao/uploaded/i4/i2/2206732831278/O1CN01P3JvYB22hJxODi8OM_!!2206732831278-0-lubanu-s.jpg",
-    "https://fulmo-img-server.com/sacoche-sacolla/7be920cacd3944409004d524bc4df2cd.jepg",
-    "https://fulmo-img-server.com/sacoche-sacolla/d6a784c84e304707bda7ad073ea31171.jepg",
-    "https://fulmo-img-server.com/sacoche-sacolla/ad8c94fe5bea4b16b0c3efb7e63b8946.jepg",
-]
 
 CATEGORY_ORDER = [
     "ナイロン", "キャンバス", "コットン", "レザーサコッシュ",
@@ -460,21 +448,23 @@ def main():
             login(page)
 
             # Google画像検索でURLを動的取得
-            search_image_urls = get_google_image_urls(browser, keyword=args.keyword, max_count=20)
+            search_image_urls = get_google_image_urls(browser, keyword=args.keyword, max_count=30)
             if not search_image_urls:
-                logger.warning("Google画像URLが取得できませんでした → ハードコードURLにフォールバック")
-                search_image_urls = SEARCH_IMAGE_URLS
+                logger.error("Google画像URLが1件も取得できませんでした。終了します。")
+                return
+
+            logger.info(f"Google画像URLを {len(search_image_urls)} 件取得 → これだけを使って検索します")
 
             added_count = 0
             variant_idx = 0
             search_url_idx = 0
 
             while added_count < args.count:
-                if search_url_idx >= len(search_image_urls) * 3:
-                    logger.warning("すべての検索URLを試しましたが目標件数に届きませんでした")
+                if search_url_idx >= len(search_image_urls):
+                    logger.warning("Google画像URLをすべて試しましたが目標件数に届きませんでした")
                     break
 
-                search_url = search_image_urls[search_url_idx % len(search_image_urls)]
+                search_url = search_image_urls[search_url_idx]
                 search_url_idx += 1
                 logger.info(f"\n--- 検索URL [{search_url_idx}]: {search_url[:60]}... ---")
 
