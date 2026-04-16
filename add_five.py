@@ -393,65 +393,80 @@ def save_image_urls_to_cache(urls: list) -> None:
     logger.info(f"{len(urls)} 件のURLをキャッシュに保存: {URL_CACHE_FILE}")
 
 
-def fetch_bing_image_urls(browser, keyword: str = "サコッシュ", max_count: int = 50) -> list:
-    """Bing画像検索から画像URLを取得する（別タブで実行）"""
-    logger.info(f"Bing画像検索: 「{keyword}」でURL取得中...")
+def fetch_1688_image_urls(browser, keyword: str = "サコッシュ", max_count: int = 50) -> list:
+    """1688.comの商品検索から画像URLを取得してキャッシュする"""
+    logger.info(f"1688.com検索: 「{keyword}」でURL取得中...")
     urls = []
-    import json as _json
+    import urllib.parse
     gpage = browser.new_page(viewport={"width": 1280, "height": 900})
     try:
+        encoded = urllib.parse.quote(keyword)
         gpage.goto(
-            f"https://www.bing.com/images/search?q={keyword}&form=HDRSC2",
+            f"https://s.1688.com/selloffer/offer_search.htm?keywords={encoded}",
             wait_until="domcontentloaded"
         )
         gpage.wait_for_timeout(3000)
 
-        # スクロールして追加画像をロード
-        for _ in range(3):
+        # スクロールして追加商品をロード
+        for _ in range(4):
             gpage.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             gpage.wait_for_timeout(1500)
 
-        # Bingは a.iusc の m 属性にJSON形式でオリジナル画像URLが入っている
-        anchors = gpage.locator("a.iusc").all()
-        logger.info(f"  Bing画像アンカー数: {len(anchors)}")
+        # 商品カードのメイン画像を取得（src2/data-srcも考慮）
+        imgs = gpage.locator(
+            'div.card-main-img img, div.img-wrapper img, div.main-image img, img.card-img'
+        ).all()
+        logger.info(f"  商品画像候補: {len(imgs)} 件")
 
-        # Taobao/Alibabaのみ使用（管理画面の画像検索はこれ以外ヒットしない）
-        ALLOWED_DOMAINS = ("alicdn.com", "taobao.com", "1688.com", "aliexpress.com",
-                           "tmall.com", "cbu01.alicdn.com", "img.alicdn.com")
-
-        for anchor in anchors:
+        for img in imgs:
             if len(urls) >= max_count:
                 break
             try:
-                m_attr = anchor.get_attribute("m") or ""
-                data = _json.loads(m_attr)
-                murl = data.get("murl", "")
-                if murl and murl.startswith("http") and murl not in urls:
-                    if any(d in murl for d in ALLOWED_DOMAINS):
-                        urls.append(murl)
-                        logger.info(f"  [{len(urls)}] {murl[:80]}")
-                    else:
-                        logger.debug(f"  スキップ（非Alibaba）: {murl[:60]}")
+                src = (img.get_attribute("src") or
+                       img.get_attribute("data-src") or
+                       img.get_attribute("data-lazy-src") or "")
+                if not src.startswith("http"):
+                    src = "https:" + src if src.startswith("//") else ""
+                if src and "alicdn.com" in src and src not in urls:
+                    urls.append(src)
+                    logger.info(f"  [{len(urls)}] {src[:80]}")
             except Exception:
                 continue
 
         if not urls:
+            # フォールバック: ページ内の全imgからalicdnを探す
+            logger.info("  フォールバック: ページ全体からalicdn URLを探します")
+            all_imgs = gpage.locator("img").all()
+            for img in all_imgs:
+                if len(urls) >= max_count:
+                    break
+                try:
+                    src = img.get_attribute("src") or img.get_attribute("data-src") or ""
+                    if not src.startswith("http"):
+                        src = "https:" + src if src.startswith("//") else ""
+                    if src and "alicdn.com" in src and src not in urls:
+                        urls.append(src)
+                        logger.info(f"  [{len(urls)}] {src[:80]}")
+                except Exception:
+                    continue
+
+        if not urls:
             logger.warning("  URLが取得できませんでした（スクリーンショット保存）")
             try:
-                gpage.screenshot(path="logs/bing_debug.png")
+                gpage.screenshot(path="logs/1688_debug.png")
             except Exception:
                 pass
 
     except Exception as e:
-        logger.warning(f"Bing画像検索エラー: {e}")
+        logger.warning(f"1688.com検索エラー: {e}")
         try:
-            gpage.screenshot(path="logs/bing_error.png")
+            gpage.screenshot(path="logs/1688_error.png")
         except Exception:
             pass
     finally:
         gpage.close()
 
-    logger.info(f"Bing画像URL取得完了: {len(urls)}件")
+    logger.info(f"1688.com画像URL取得完了: {len(urls)}件")
     return urls
 
 
@@ -488,12 +503,12 @@ def main():
 
             # 画像URLの取得: キャッシュがあれば読み込み、なければBingから取得して保存
             if args.refresh_urls or not URL_CACHE_FILE.exists():
-                logger.info("Bingから画像URLを取得してキャッシュに保存します...")
-                search_image_urls = fetch_bing_image_urls(browser, keyword=args.keyword, max_count=50)
+                logger.info("1688.comから画像URLを取得してキャッシュに保存します...")
+                search_image_urls = fetch_1688_image_urls(browser, keyword=args.keyword, max_count=50)
                 if search_image_urls:
                     save_image_urls_to_cache(search_image_urls)
                 else:
-                    logger.error("Bingから画像URLが取得できませんでした。終了します。")
+                    logger.error("1688.comから画像URLが取得できませんでした。終了します。")
                     return
             else:
                 search_image_urls = load_cached_image_urls()
