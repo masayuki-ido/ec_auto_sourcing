@@ -1,0 +1,7 @@
+playwright==1.44.0
+easyocr==1.7.1
+Pillow==10.3.0
+python-dotenv==1.0.1
+schedule==1.2.2
+numpy==1.26.4
+requests==2.31.0
