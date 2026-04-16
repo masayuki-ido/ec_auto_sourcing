@@ -13,7 +13,7 @@
     python add_five.py --count 3
     python add_five.py --csv /path/to/items.csv
 """
-import argparse, logging, re, sys, csv, time
+import argparse, logging, re, sys, csv, time, threading, http.server, socketserver
 from pathlib import Path
 from io import BytesIO
 
@@ -393,62 +393,88 @@ def save_image_urls_to_cache(urls: list) -> None:
     logger.info(f"{len(urls)} 件のURLをキャッシュに保存: {URL_CACHE_FILE}")
 
 
+IMAGES_DIR = Path("search_images")
+
+
+def download_images_from_urls(urls: list, max_images: int = 30) -> list:
+    """URLリストから画像をローカルに保存し、保存済みファイルパスを返す"""
+    IMAGES_DIR.mkdir(exist_ok=True)
+    saved = []
+    for i, url in enumerate(urls[:max_images]):
+        dest = IMAGES_DIR / f"img_{i:03d}.jpg"
+        if dest.exists():
+            saved.append(str(dest))
+            continue
+        try:
+            resp = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+            if resp.status_code == 200 and resp.content:
+                dest.write_bytes(resp.content)
+                saved.append(str(dest))
+                logger.info(f"  DL [{len(saved)}] {url[:70]}")
+        except Exception as e:
+            logger.debug(f"  DL失敗: {e}")
+    logger.info(f"ローカル画像保存完了: {len(saved)}件 → {IMAGES_DIR}/")
+    return saved
+
+
+def start_local_image_server(port: int = 18765) -> "http.server.HTTPServer":
+    """search_images/ を提供するローカルHTTPサーバーを別スレッドで起動"""
+    import http.server
+    import socketserver
+
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *a, **kw):
+            super().__init__(*a, directory=str(IMAGES_DIR.resolve()), **kw)
+        def log_message(self, *_):
+            pass  # ログ抑制
+
+    server = socketserver.TCPServer(("127.0.0.1", port), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    logger.info(f"ローカル画像サーバー起動: http://127.0.0.1:{port}/")
+    return server
+
+
 def fetch_1688_image_urls(browser, keyword: str = "サコッシュ", max_count: int = 50) -> list:
-    """1688.comの商品検索から画像URLを取得してキャッシュする"""
+    """1688.comの商品検索からAliCDN画像URLを取得する"""
     logger.info(f"1688.com検索: 「{keyword}」でURL取得中...")
     urls = []
     import urllib.parse
-    gpage = browser.new_page(viewport={"width": 1280, "height": 900})
+    gpage = browser.new_page(
+        viewport={"width": 1280, "height": 900},
+        user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                   "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    )
     try:
         encoded = urllib.parse.quote(keyword)
         gpage.goto(
             f"https://s.1688.com/selloffer/offer_search.htm?keywords={encoded}",
-            wait_until="domcontentloaded"
+            wait_until="domcontentloaded",
+            timeout=60_000
         )
-        gpage.wait_for_timeout(3000)
+        gpage.wait_for_timeout(4000)
 
-        # スクロールして追加商品をロード
-        for _ in range(4):
+        for _ in range(5):
             gpage.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             gpage.wait_for_timeout(1500)
 
-        # 商品カードのメイン画像を取得（src2/data-srcも考慮）
-        imgs = gpage.locator(
-            'div.card-main-img img, div.img-wrapper img, div.main-image img, img.card-img'
-        ).all()
-        logger.info(f"  商品画像候補: {len(imgs)} 件")
-
-        for img in imgs:
+        # ページ内の全imgからalicdnを抽出
+        all_imgs = gpage.locator("img").all()
+        logger.info(f"  img要素数: {len(all_imgs)}")
+        for img in all_imgs:
             if len(urls) >= max_count:
                 break
             try:
                 src = (img.get_attribute("src") or
                        img.get_attribute("data-src") or
                        img.get_attribute("data-lazy-src") or "")
-                if not src.startswith("http"):
-                    src = "https:" + src if src.startswith("//") else ""
+                if src.startswith("//"):
+                    src = "https:" + src
                 if src and "alicdn.com" in src and src not in urls:
                     urls.append(src)
                     logger.info(f"  [{len(urls)}] {src[:80]}")
             except Exception:
                 continue
-
-        if not urls:
-            # フォールバック: ページ内の全imgからalicdnを探す
-            logger.info("  フォールバック: ページ全体からalicdn URLを探します")
-            all_imgs = gpage.locator("img").all()
-            for img in all_imgs:
-                if len(urls) >= max_count:
-                    break
-                try:
-                    src = img.get_attribute("src") or img.get_attribute("data-src") or ""
-                    if not src.startswith("http"):
-                        src = "https:" + src if src.startswith("//") else ""
-                    if src and "alicdn.com" in src and src not in urls:
-                        urls.append(src)
-                        logger.info(f"  [{len(urls)}] {src[:80]}")
-                except Exception:
-                    continue
 
         if not urls:
             logger.warning("  URLが取得できませんでした（スクリーンショット保存）")
@@ -492,7 +518,8 @@ def main():
         # EasyOCRを事前ロード（時間がかかるので先にやっておく）
         get_ocr_reader()
 
-    added_count = 0  # finally で参照するため外側で初期化
+    added_count = 0       # finally で参照するため外側で初期化
+    local_server = None   # finally で参照するため外側で初期化
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=False)
@@ -502,21 +529,37 @@ def main():
             login(page)
 
             # 画像URLの取得: キャッシュがあれば読み込み、なければBingから取得して保存
+            # ① URLキャッシュ or 1688から取得
             if args.refresh_urls or not URL_CACHE_FILE.exists():
                 logger.info("1688.comから画像URLを取得してキャッシュに保存します...")
-                search_image_urls = fetch_1688_image_urls(browser, keyword=args.keyword, max_count=50)
-                if search_image_urls:
-                    save_image_urls_to_cache(search_image_urls)
+                raw_urls = fetch_1688_image_urls(browser, keyword=args.keyword, max_count=50)
+                if raw_urls:
+                    save_image_urls_to_cache(raw_urls)
                 else:
                     logger.error("1688.comから画像URLが取得できませんでした。終了します。")
                     return
             else:
-                search_image_urls = load_cached_image_urls()
-                if not search_image_urls:
+                raw_urls = load_cached_image_urls()
+                if not raw_urls:
                     logger.error(f"キャッシュが空です: {URL_CACHE_FILE}  --refresh-urls で再取得してください。")
                     return
 
-            logger.info(f"検索用画像URL: {len(search_image_urls)} 件")
+            # ② 画像をローカルDL（未DL分のみ）
+            if args.refresh_urls or not any(IMAGES_DIR.glob("img_*.jpg")):
+                logger.info("画像をローカルにダウンロードします...")
+                download_images_from_urls(raw_urls, max_images=30)
+
+            local_files = sorted(IMAGES_DIR.glob("img_*.jpg"))
+            if not local_files:
+                logger.error("ローカル画像が1件もありません。終了します。")
+                return
+
+            # ③ ローカルHTTPサーバーを起動して localhost URL を生成
+            local_server = start_local_image_server(port=18765)
+            search_image_urls = [
+                f"http://127.0.0.1:18765/{f.name}" for f in local_files
+            ]
+            logger.info(f"検索用ローカル画像URL: {len(search_image_urls)} 件")
 
             variant_idx = 0
             search_url_idx = 0
@@ -641,6 +684,10 @@ def main():
             page.screenshot(path="logs/unexpected_error.png")
 
         finally:
+            try:
+                local_server.shutdown()
+            except Exception:
+                pass
             logger.info(f"\n{'='*50}")
             logger.info(f"完了: {added_count}/{args.count}件 追加しました")
             logger.info(f"{'='*50}")
