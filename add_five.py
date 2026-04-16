@@ -364,7 +364,7 @@ def try_add_product(page, concept: str, color: str, size: str, dry_run: bool) ->
     return False, "すべてのカテゴリで失敗"
 
 
-def get_google_image_urls(browser, keyword: str = "サコッシュ", max_count: int = 20) -> list:
+def get_google_image_urls(browser, keyword: str = "サコッシュ", max_count: int = 30) -> list:
     """Google画像検索からURLリストを動的に取得する（別タブで実行）"""
     logger.info(f"Google画像検索: 「{keyword}」でURL取得中...")
     urls = []
@@ -372,46 +372,81 @@ def get_google_image_urls(browser, keyword: str = "サコッシュ", max_count: 
     try:
         gpage.goto(
             f"https://www.google.com/search?q={keyword}&tbm=isch&hl=ja",
-            wait_until="domcontentloaded"
+            wait_until="networkidle"
         )
-        gpage.wait_for_timeout(2000)
+        gpage.wait_for_timeout(3000)
 
         # 同意ページ対応
-        try:
-            btn = gpage.locator('button:has-text("同意する"), button:has-text("Accept all")').first
-            if btn.is_visible(timeout=2000):
-                btn.click()
-                gpage.wait_for_timeout(1000)
-        except Exception:
-            pass
-
-        # サムネイルをクリックして大きい画像URLを収集
-        thumbs = gpage.locator('div[data-id] img, g-img img, div[jsname] img[src^="http"]').all()
-        logger.info(f"  サムネイル数: {len(thumbs)}")
-
-        for thumb in thumbs:
-            if len(urls) >= max_count:
-                break
+        for btn_text in ["同意する", "Accept all", "すべて同意"]:
             try:
-                thumb.scroll_into_view_if_needed()
-                thumb.click()
-                gpage.wait_for_timeout(800)
-                # サイドパネルの大きい画像を取得
-                for sel in ['img.iPVvYb', 'img.r48jcc', 'img[jsname="kn3ccd"]', 'img[jsname="JuXqh"]']:
-                    try:
-                        big = gpage.locator(sel).first
-                        src = big.get_attribute('src') or ''
-                        if src.startswith('http') and 'google' not in src and src not in urls:
-                            urls.append(src)
-                            logger.info(f"  [{len(urls)}] {src[:80]}")
-                            break
-                    except Exception:
-                        continue
+                btn = gpage.locator(f'button:has-text("{btn_text}")').first
+                if btn.is_visible(timeout=1000):
+                    btn.click()
+                    gpage.wait_for_timeout(1500)
+                    break
             except Exception:
-                continue
+                pass
+
+        # スクロールして画像をロード
+        gpage.evaluate("window.scrollTo(0, 400)")
+        gpage.wait_for_timeout(1500)
+
+        # 複数セレクタを順番に試してサムネイルを取得
+        thumbs = []
+        for sel in [
+            'img.YQ4gaf',
+            'div[data-id] img',
+            'g-img img',
+            'img.rg_i',
+            '#islrg img',
+        ]:
+            found = gpage.locator(sel).all()
+            if found:
+                logger.info(f"  セレクタ「{sel}」で {len(found)} 件発見")
+                thumbs = found
+                break
+
+        if not thumbs:
+            logger.warning("  サムネイルが見つかりません（スクリーンショット保存）")
+            try:
+                gpage.screenshot(path="logs/google_debug.png")
+            except Exception:
+                pass
+        else:
+            for thumb in thumbs:
+                if len(urls) >= max_count:
+                    break
+                try:
+                    thumb.scroll_into_view_if_needed()
+                    thumb.click()
+                    gpage.wait_for_timeout(1000)
+                    # サイドパネルの大きい画像を取得
+                    for sel in [
+                        'img.iPVvYb', 'img.r48jcc',
+                        'img[jsname="kn3ccd"]', 'img[jsname="JuXqh"]',
+                        'img[jsname="n3VNCb"]',
+                    ]:
+                        try:
+                            big = gpage.locator(sel).first
+                            src = big.get_attribute('src') or ''
+                            if (src.startswith('http')
+                                    and 'google' not in src
+                                    and 'gstatic' not in src
+                                    and src not in urls):
+                                urls.append(src)
+                                logger.info(f"  [{len(urls)}] {src[:80]}")
+                                break
+                        except Exception:
+                            continue
+                except Exception:
+                    continue
 
     except Exception as e:
         logger.warning(f"Google画像検索エラー: {e}")
+        try:
+            gpage.screenshot(path="logs/google_error.png")
+        except Exception:
+            pass
     finally:
         gpage.close()
 
@@ -440,6 +475,8 @@ def main():
         # EasyOCRを事前ロード（時間がかかるので先にやっておく）
         get_ocr_reader()
 
+    added_count = 0  # finally で参照するため外側で初期化
+
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=False)
         page = browser.new_page(viewport={"width": 1280, "height": 900})
@@ -455,7 +492,6 @@ def main():
 
             logger.info(f"Google画像URLを {len(search_image_urls)} 件取得 → これだけを使って検索します")
 
-            added_count = 0
             variant_idx = 0
             search_url_idx = 0
 
