@@ -240,23 +240,33 @@ def select_images_for_product(page, modal) -> None:
 
     # 商品画像: 先頭から最大5枚
     product_indices = usable_indices[:5]
+    clicked_product = []
     for idx in product_indices:
         try:
-            product_btns[idx].click()
-            page.wait_for_timeout(250)
-        except Exception:
-            pass
-    logger.info(f"  商品画像を追加: {product_indices}")
+            btn = product_btns[idx]
+            btn.scroll_into_view_if_needed()
+            page.wait_for_timeout(200)
+            btn.click(force=True)
+            page.wait_for_timeout(400)
+            clicked_product.append(idx)
+        except Exception as e:
+            logger.debug(f"    商品画像ボタン[{idx}]クリック失敗: {e}")
+    logger.info(f"  商品画像を追加: {clicked_product}")
 
     # サイズ画像: 末尾から2枚（商品画像と重複してもOK）
     size_indices = usable_indices[-2:] if len(usable_indices) >= 2 else usable_indices
+    clicked_size = []
     for idx in size_indices:
         try:
-            size_btns[idx].click()
-            page.wait_for_timeout(250)
-        except Exception:
-            pass
-    logger.info(f"  サイズ画像を追加: {size_indices}")
+            btn = size_btns[idx]
+            btn.scroll_into_view_if_needed()
+            page.wait_for_timeout(200)
+            btn.click(force=True)
+            page.wait_for_timeout(400)
+            clicked_size.append(idx)
+        except Exception as e:
+            logger.debug(f"    サイズ画像ボタン[{idx}]クリック失敗: {e}")
+    logger.info(f"  サイズ画像を追加: {clicked_size}")
 
     page.wait_for_timeout(600)
 
@@ -297,7 +307,7 @@ def try_add_product(page, concept: str, color: str, size: str, dry_run: bool) ->
 
         try:
             cat_select.select_option(value=cat_val)
-            page.wait_for_timeout(400)
+            page.wait_for_timeout(1200)
         except Exception:
             return True, "カテゴリ選択中にモーダルが閉じた（追加完了の可能性）"
 
@@ -405,6 +415,10 @@ def fetch_bing_image_urls(browser, keyword: str = "サコッシュ", max_count: 
         anchors = gpage.locator("a.iusc").all()
         logger.info(f"  Bing画像アンカー数: {len(anchors)}")
 
+        # Taobao/Alibabaのみ使用（管理画面の画像検索はこれ以外ヒットしない）
+        ALLOWED_DOMAINS = ("alicdn.com", "taobao.com", "1688.com", "aliexpress.com",
+                           "tmall.com", "cbu01.alicdn.com", "img.alicdn.com")
+
         for anchor in anchors:
             if len(urls) >= max_count:
                 break
@@ -413,8 +427,11 @@ def fetch_bing_image_urls(browser, keyword: str = "サコッシュ", max_count: 
                 data = _json.loads(m_attr)
                 murl = data.get("murl", "")
                 if murl and murl.startswith("http") and murl not in urls:
-                    urls.append(murl)
-                    logger.info(f"  [{len(urls)}] {murl[:80]}")
+                    if any(d in murl for d in ALLOWED_DOMAINS):
+                        urls.append(murl)
+                        logger.info(f"  [{len(urls)}] {murl[:80]}")
+                    else:
+                        logger.debug(f"  スキップ（非Alibaba）: {murl[:60]}")
             except Exception:
                 continue
 
