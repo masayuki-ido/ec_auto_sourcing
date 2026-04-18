@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>WF - レビュー投稿 | バッグ口コミサイト</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; }
+  .ph { background: repeating-linear-gradient(45deg, #e5e5e5, #e5e5e5 10px, #d4d4d4 10px, #d4d4d4 20px); color:#666; display:flex; align-items:center; justify-content:center; }
+  .star { cursor:pointer; color:#ddd; font-size:28px; }
+  .star.on { color:#D4A24E; }
+</style>
+</head>
+<body class="bg-[#F8F6F2] text-[#222]">
+
+<div class="max-w-4xl mx-auto">
+  <!-- ヘッダー -->
+  <header class="flex items-center justify-between px-6 py-4 border-b border-gray-300 bg-white">
+    <a href="index.html" class="text-xl font-serif font-bold">BagReview<span class="text-[#7A4D3C]">.</span></a>
+    <nav class="flex gap-6 text-sm">
+      <a href="category.html" class="hover:underline">ブランド</a>
+      <a href="category.html" class="hover:underline">カテゴリ</a>
+    </nav>
+    <div class="text-sm">ログイン中: miyu_22</div>
+  </header>
+
+  <div class="px-6 py-6">
+    <a href="product.html" class="text-sm text-gray-500">← 商品に戻る</a>
+    <h1 class="text-2xl font-bold mt-2">レビューを書く</h1>
+
+    <!-- 商品情報 -->
+    <div class="bg-white border rounded-lg p-4 mt-4 flex items-center gap-4">
+      <div class="ph w-20 h-20 rounded">[画像]</div>
+      <div>
+        <div class="text-xs text-gray-500">COACH</div>
+        <div class="font-bold">ウィロウ トート 24</div>
+        <div class="text-xs text-gray-500 mt-1">現在の平均 ★4.6 (82件)</div>
+      </div>
+    </div>
+
+    <!-- ステップ1: 総合評価 -->
+    <section class="bg-white border rounded-lg p-6 mt-4">
+      <div class="text-xs text-[#7A4D3C] font-bold">STEP 1</div>
+      <h2 class="text-lg font-bold mt-1">総合評価 <span class="text-red-500">*</span></h2>
+      <div class="mt-3 flex items-center gap-2">
+        <span class="star on">★</span>
+        <span class="star on">★</span>
+        <span class="star on">★</span>
+        <span class="star on">★</span>
+        <span class="star on">★</span>
+        <span class="ml-3 text-lg font-bold">5.0</span>
+      </div>
+      <input type="text" placeholder="ひとことタイトル（例: 期待以上でした）" class="mt-3 w-full border rounded px-3 py-2">
+    </section>
+
+    <!-- ステップ2: サブ評価 -->
+    <section class="bg-white border rounded-lg p-6 mt-4">
+      <div class="text-xs text-[#7A4D3C] font-bold">STEP 2</div>
+      <h2 class="text-lg font-bold mt-1">項目別に評価する <span class="text-gray-400 text-sm">(任意)</span></h2>
+      <div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+        <div>
+          <div class="mb-1">収納力</div>
+          <div class="flex gap-1">
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1">軽さ</div>
+          <div class="flex gap-1">
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star">★</span>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1">素材の質感</div>
+          <div class="flex gap-1">
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1">金具・縫製</div>
+          <div class="flex gap-1">
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star">★</span>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1">デザイン</div>
+          <div class="flex gap-1">
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span>
+          </div>
+        </div>
+        <div>
+          <div class="mb-1">コーデ合わせやすさ</div>
+          <div class="flex gap-1">
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star">★</span>
+          </div>
+        </div>
+        <div class="col-span-2">
+          <div class="mb-1">価格満足度</div>
+          <div class="flex gap-1">
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star">★</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ステップ3: タグ -->
+    <section class="bg-white border rounded-lg p-6 mt-4">
+      <div class="text-xs text-[#7A4D3C] font-bold">STEP 3</div>
+      <h2 class="text-lg font-bold mt-1">タグ <span class="text-gray-400 text-sm">(複数選択可)</span></h2>
+
+      <div class="mt-4">
+        <div class="text-sm text-gray-600 mb-2">入るもの</div>
+        <div class="flex flex-wrap gap-2 text-sm">
+          <button class="px-3 py-1 bg-[#7A4D3C] text-white rounded-full">A4書類</button>
+          <button class="px-3 py-1 bg-[#7A4D3C] text-white rounded-full">13インチPC</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">15インチPC</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">ペットボトル</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">折り畳み傘</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">化粧ポーチ</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <div class="text-sm text-gray-600 mb-2">使うシーン</div>
+        <div class="flex flex-wrap gap-2 text-sm">
+          <button class="px-3 py-1 bg-[#7A4D3C] text-white rounded-full">通勤</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">通学</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">お出かけ</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">旅行</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">フォーマル</button>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <div class="text-sm text-gray-600 mb-2">特徴</div>
+        <div class="flex flex-wrap gap-2 text-sm">
+          <button class="px-3 py-1 bg-[#7A4D3C] text-white rounded-full">自立する</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">軽い</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">防水</button>
+          <button class="px-3 py-1 bg-gray-100 rounded-full">仕切り多い</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ステップ4: 自由記述 -->
+    <section class="bg-white border rounded-lg p-6 mt-4">
+      <div class="text-xs text-[#7A4D3C] font-bold">STEP 4</div>
+      <h2 class="text-lg font-bold mt-1">詳しく教えてください</h2>
+
+      <div class="mt-3">
+        <label class="block text-sm font-bold text-green-700 mb-1">👍 良かったポイント <span class="text-red-500">*</span></label>
+        <textarea rows="4" class="w-full border rounded px-3 py-2" placeholder="例: A4書類が余裕で入る。革質が高級感ある..."></textarea>
+      </div>
+
+      <div class="mt-3">
+        <label class="block text-sm font-bold text-red-700 mb-1">⚠️ 気になったポイント <span class="text-gray-400 text-xs">(任意)</span></label>
+        <textarea rows="3" class="w-full border rounded px-3 py-2" placeholder="例: 内ポケットが少ない..."></textarea>
+      </div>
+    </section>
+
+    <!-- ステップ5: 写真 -->
+    <section class="bg-white border rounded-lg p-6 mt-4">
+      <div class="text-xs text-[#7A4D3C] font-bold">STEP 5</div>
+      <h2 class="text-lg font-bold mt-1">写真 <span class="text-gray-400 text-sm">(最大5枚・任意)</span></h2>
+      <div class="grid grid-cols-5 gap-3 mt-3">
+        <div class="ph h-24 rounded">[写真1]</div>
+        <div class="ph h-24 rounded">[写真2]</div>
+        <div class="border-2 border-dashed border-gray-300 h-24 rounded flex items-center justify-center text-gray-400 text-3xl">+</div>
+        <div class="border-2 border-dashed border-gray-300 h-24 rounded flex items-center justify-center text-gray-400 text-3xl">+</div>
+        <div class="border-2 border-dashed border-gray-300 h-24 rounded flex items-center justify-center text-gray-400 text-3xl">+</div>
+      </div>
+    </section>
+
+    <!-- ステップ6: 属性 -->
+    <section class="bg-white border rounded-lg p-6 mt-4">
+      <div class="text-xs text-[#7A4D3C] font-bold">STEP 6</div>
+      <h2 class="text-lg font-bold mt-1">あなたについて <span class="text-gray-400 text-sm">(任意・他ユーザーの参考情報)</span></h2>
+      <div class="grid grid-cols-3 gap-4 mt-3 text-sm">
+        <div>
+          <label class="block text-gray-600 mb-1">身長</label>
+          <select class="w-full border rounded px-3 py-2 bg-white">
+            <option>選択しない</option>
+            <option>〜150cm</option>
+            <option>150-160cm</option>
+            <option>160-170cm</option>
+            <option>170cm〜</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-gray-600 mb-1">体型</label>
+          <select class="w-full border rounded px-3 py-2 bg-white">
+            <option>選択しない</option>
+            <option>華奢</option>
+            <option>標準</option>
+            <option>がっしり</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-gray-600 mb-1">普段の荷物量</label>
+          <select class="w-full border rounded px-3 py-2 bg-white">
+            <option>選択しない</option>
+            <option>少なめ</option>
+            <option>標準</option>
+            <option>多め</option>
+          </select>
+        </div>
+        <div class="col-span-3">
+          <label class="block text-gray-600 mb-1">購入情報（任意）</label>
+          <div class="grid grid-cols-2 gap-3">
+            <input type="text" placeholder="購入時期（例: 2026年3月）" class="border rounded px-3 py-2">
+            <input type="text" placeholder="購入店（例: COACH公式）" class="border rounded px-3 py-2">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 投稿ボタン -->
+    <div class="mt-6 flex gap-3">
+      <button class="flex-1 border py-3 rounded bg-white hover:bg-gray-50">下書き保存</button>
+      <button class="flex-[2] bg-[#7A4D3C] text-white py-3 rounded hover:opacity-90">レビューを投稿する</button>
+    </div>
+    <p class="text-xs text-gray-500 mt-3">投稿されたレビューは他のユーザーに公開されます。誹謗中傷や虚偽の内容は削除されることがあります。</p>
+  </div>
+
+  <footer class="px-6 py-8 text-xs text-gray-500 border-t">BagReview © 2026</footer>
+</div>
+
+</body>
+</html>
