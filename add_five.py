@@ -59,6 +59,8 @@ PRODUCT_VARIANTS = [
 
 # ─── EasyOCR（遅延ロード・1回だけ初期化） ──────────────────
 _ocr_reader = None
+_ocr_filter_enabled = True  # --no-filter で False になる
+
 def get_ocr_reader():
     global _ocr_reader
     if _ocr_reader is None:
@@ -76,6 +78,8 @@ def is_usable_image(img_url: str) -> bool:
     True: 使用OK
     False: 除外（空白画像 or 中国語/韓国語テキストあり）
     """
+    if not _ocr_filter_enabled:
+        return True
     if img_url in _img_cache:
         return _img_cache[img_url]
 
@@ -153,14 +157,60 @@ def login(page) -> None:
     logger.info("ログイン成功")
 
 
-def search_products(page, image_url: str) -> bool:
+def search_products(page, keyword: str = "サコッシュ") -> bool:
     page.goto(f"{BASE}/item/search", wait_until="networkidle")
     page.wait_for_timeout(1000)
-    page.select_option("select", value="image")
+
+    # 利用可能なセレクトオプションをログ出力
+    try:
+        sel_opts = page.locator("select").first.locator("option").all()
+        opts_info = [(o.get_attribute("value"), o.inner_text().strip()) for o in sel_opts]
+        logger.info(f"  検索タイプ選択肢: {opts_info}")
+        # "image" 以外のキーワード系オプションを優先
+        kw_val = None
+        for val, text in opts_info:
+            if val and val != "image":
+                kw_val = val
+                logger.info(f"  キーワード検索オプション使用: value='{val}' ({text})")
+                break
+        if kw_val:
+            page.select_option("select", value=kw_val)
+        else:
+            logger.warning("  キーワード検索オプションが見つかりません。imageモードで試みます")
+            page.select_option("select", value="image")
+    except Exception as e:
+        logger.warning(f"  セレクトオプション取得失敗: {e}")
+
+    page.wait_for_timeout(1000)
+
+    # キーワード入力欄を探す（より広いセレクタで）
+    filled = False
+    for sel in ['input[placeholder*="キーワード"]', 'input[placeholder*="検索"]',
+                'input[name="keyword"]', 'input[type="search"]',
+                'input[placeholder*="URL"]', 'input[type="text"]', 'input']:
+        try:
+            el = page.locator(sel).first
+            if el.is_visible(timeout=800):
+                val = el.input_value(timeout=500)
+                el.fill(keyword)
+                logger.info(f"  キーワード入力: 「{keyword}」→ {sel}")
+                filled = True
+                break
+        except Exception:
+            continue
+
+    if not filled:
+        logger.warning("  キーワード入力欄が見つかりませんでした")
+
+    # ボタンが有効になるまで最大5秒待つ
     page.wait_for_timeout(500)
-    page.fill('input[placeholder*="URL"]', image_url)
-    page.click('button:has-text("検索")')
-    logger.info(f"  検索中: {image_url[:70]}...")
+    try:
+        page.wait_for_selector('button:has-text("検索"):not([disabled])', timeout=5_000)
+    except Exception:
+        pass
+
+    page.click('button:has-text("検索")', timeout=10_000)
+    logger.info(f"  検索実行: 「{keyword}」")
     try:
         page.wait_for_selector('button:has-text("詳細を見る")', timeout=30_000)
         return True
@@ -238,37 +288,41 @@ def select_images_for_product(page, modal) -> None:
         logger.warning("  フィルタ通過画像なし → 全画像を使用")
         usable_indices = list(range(total))
 
-    # 商品画像: 先頭から最大5枚
+    # 商品画像: 先頭から最大5枚（ボタンリストは一度だけ取得）
     product_indices = usable_indices[:5]
     clicked_product = []
     for idx in product_indices:
+        if idx >= len(product_btns):
+            break
         try:
             btn = product_btns[idx]
             btn.scroll_into_view_if_needed()
-            page.wait_for_timeout(200)
+            page.wait_for_timeout(300)
             btn.click(force=True)
-            page.wait_for_timeout(400)
+            page.wait_for_timeout(500)
             clicked_product.append(idx)
         except Exception as e:
             logger.debug(f"    商品画像ボタン[{idx}]クリック失敗: {e}")
     logger.info(f"  商品画像を追加: {clicked_product}")
 
-    # サイズ画像: 末尾から2枚（商品画像と重複してもOK）
-    size_indices = usable_indices[-2:] if len(usable_indices) >= 2 else usable_indices
+    page.wait_for_timeout(800)
+
+    # サイズ画像: 先頭2枚を使用（ボタンリストは一度だけ取得・インデックスずれを防ぐ）
+    size_target = size_btns[:2] if len(size_btns) >= 2 else size_btns
     clicked_size = []
-    for idx in size_indices:
+    for i, btn in enumerate(size_target):
         try:
-            btn = size_btns[idx]
             btn.scroll_into_view_if_needed()
-            page.wait_for_timeout(200)
+            page.wait_for_timeout(500)
             btn.click(force=True)
-            page.wait_for_timeout(400)
-            clicked_size.append(idx)
+            page.wait_for_timeout(1000)
+            clicked_size.append(i)
+            logger.info(f"    サイズ画像[{i}]クリック完了")
         except Exception as e:
-            logger.debug(f"    サイズ画像ボタン[{idx}]クリック失敗: {e}")
+            logger.debug(f"    サイズ画像ボタン[{i}]クリック失敗: {e}")
     logger.info(f"  サイズ画像を追加: {clicked_size}")
 
-    page.wait_for_timeout(600)
+    page.wait_for_timeout(800)
 
 
 def try_add_product(page, concept: str, color: str, size: str, dry_run: bool) -> tuple[bool, str]:
@@ -509,6 +563,10 @@ def main():
 
     logger.info(f"=== add_five.py 開始 | dry_run={args.dry_run} | 目標={args.count}件 ===")
 
+    global _ocr_filter_enabled
+    if args.no_filter:
+        _ocr_filter_enabled = False
+
     existing_urls = load_existing_urls(Path(args.csv))
 
     # セッション内で試みたsupplier_urlも除外対象に追加
@@ -528,154 +586,107 @@ def main():
         try:
             login(page)
 
-            # 画像URLの取得: キャッシュがあれば読み込み、なければBingから取得して保存
-            # ① URLキャッシュ or 1688から取得
-            if args.refresh_urls or not URL_CACHE_FILE.exists():
-                logger.info("1688.comから画像URLを取得してキャッシュに保存します...")
-                raw_urls = fetch_1688_image_urls(browser, keyword=args.keyword, max_count=50)
-                if raw_urls:
-                    save_image_urls_to_cache(raw_urls)
-                else:
-                    logger.error("1688.comから画像URLが取得できませんでした。終了します。")
-                    return
-            else:
-                raw_urls = load_cached_image_urls()
-                if not raw_urls:
-                    logger.error(f"キャッシュが空です: {URL_CACHE_FILE}  --refresh-urls で再取得してください。")
-                    return
-
-            # ② 画像をローカルDL（未DL分のみ）
-            if args.refresh_urls or not any(IMAGES_DIR.glob("img_*.jpg")):
-                logger.info("画像をローカルにダウンロードします...")
-                download_images_from_urls(raw_urls, max_images=30)
-
-            local_files = sorted(IMAGES_DIR.glob("img_*.jpg"))
-            if not local_files:
-                logger.error("ローカル画像が1件もありません。終了します。")
+            # キーワード検索で商品一覧を取得
+            logger.info(f"\nキーワード「{args.keyword}」で検索します...")
+            if not search_products(page, args.keyword):
+                logger.error("検索に失敗しました。終了します。")
                 return
 
-            # ③ ローカルHTTPサーバーを起動して localhost URL を生成
-            local_server = start_local_image_server(port=18765)
-            search_image_urls = [
-                f"http://127.0.0.1:18765/{f.name}" for f in local_files
-            ]
-            logger.info(f"検索用ローカル画像URL: {len(search_image_urls)} 件")
+            detail_locator = page.locator('button:has-text("詳細を見る")')
+            total_btns = detail_locator.count()
+            logger.info(f"  「詳細を見る」ボタン数: {total_btns}")
 
             variant_idx = 0
-            search_url_idx = 0
+            btn_idx = 0
 
             while added_count < args.count:
-                if search_url_idx >= len(search_image_urls):
-                    logger.warning("画像URLをすべて試しましたが目標件数に届きませんでした（--refresh-urls で再取得できます）")
+                if btn_idx >= total_btns:
+                    logger.warning("検索結果の商品をすべて試しましたが目標件数に届きませんでした")
                     break
 
-                search_url = search_image_urls[search_url_idx]
-                search_url_idx += 1
-                logger.info(f"\n--- 検索URL [{search_url_idx}]: {search_url[:60]}... ---")
+                i = btn_idx
+                btn_idx += 1
+                logger.info(f"\n--- 商品 [{i+1}/{total_btns}] ---")
 
-                # イテレーション単位でエラーを吸収して次のURLへ続行
                 try:
-                    if not search_products(page, search_url):
-                        continue
+                    btn = detail_locator.nth(i)
+                    btn.click()
+                    page.wait_for_selector('[role="dialog"]', timeout=8_000)
+                    page.wait_for_timeout(1500)
 
-                    detail_btns = page.query_selector_all('button:has-text("詳細を見る")')
-                    logger.info(f"  「詳細を見る」ボタン数: {len(detail_btns)}")
+                    # 画像枚数チェック
+                    modal_text = page.locator('[role="dialog"]').inner_text()
+                    slide_m = re.search(r'(\d+)/(\d+)', modal_text)
+                    total_slides = int(slide_m.group(2)) if slide_m else 0
 
-                    found_new = False
-                    for i, btn in enumerate(detail_btns[:20]):
-                        try:
-                            btn.click()
-                            page.wait_for_selector('[role="dialog"]', timeout=8_000)
-                            page.wait_for_timeout(1500)
-
-                            # 画像枚数チェック
-                            modal_text = page.locator('[role="dialog"]').inner_text()
-                            slide_m = re.search(r'(\d+)/(\d+)', modal_text)
-                            total_slides = int(slide_m.group(2)) if slide_m else 0
-
-                            if total_slides < 3:
-                                logger.info(f"  [{i}] 画像{total_slides}枚（不足）→ スキップ")
-                                page.keyboard.press("Escape")
-                                page.wait_for_timeout(500)
-                                continue
-
-                            # supplier_url 取得・重複チェック
-                            supplier_url = get_modal_supplier_url(page)
-                            norm_url = supplier_url.replace('.html', '.htm') if supplier_url else ''
-
-                            if norm_url and (norm_url in existing_urls or norm_url in session_tried):
-                                logger.info(f"  [{i}] 既知URL → スキップ: {supplier_url[:60]}")
-                                page.keyboard.press("Escape")
-                                page.wait_for_timeout(500)
-                                continue
-
-                            logger.info(f"  [{i}] 新規商品 ({total_slides}枚) supplier_url={supplier_url[:60]}")
-                            if norm_url:
-                                session_tried.add(norm_url)
-
-                            # 価格チェック（上限超えはスキップ）
-                            price = get_modal_price(page)
-                            if price > args.max_price:
-                                logger.info(f"  [{i}] 価格{price}円 > {args.max_price}円 → スキップ")
-                                page.keyboard.press("Escape")
-                                page.wait_for_timeout(500)
-                                continue
-                            if price > 0:
-                                logger.info(f"  [{i}] 価格チェックOK: {price}円")
-
-                            found_new = True
-
-                            variant = PRODUCT_VARIANTS[variant_idx % len(PRODUCT_VARIANTS)]
-                            variant_idx += 1
-
-                            success, result = try_add_product(
-                                page, variant["concept"], variant["color"], variant["size"],
-                                dry_run=args.dry_run
-                            )
-
-                            if success:
-                                added_count += 1
-                                if norm_url:
-                                    existing_urls.add(norm_url)
-                                logger.info(f"✓✓✓ {added_count}/{args.count}件目 追加完了！（{result}）")
-                                try:
-                                    page.screenshot(path=f"logs/added_{added_count:02d}.png", full_page=True)
-                                except Exception:
-                                    pass
-                                # モーダルを確実に閉じてから次へ
-                                try:
-                                    page.keyboard.press("Escape")
-                                    page.wait_for_timeout(800)
-                                    page.locator('[role="dialog"]').wait_for(state="hidden", timeout=3_000)
-                                except Exception:
-                                    pass
-                                logger.info(f"  → 次の商品へ ({added_count}/{args.count}件完了)")
-                            else:
-                                logger.warning(f"  失敗: {result}")
-                                try:
-                                    page.keyboard.press("Escape")
-                                    page.wait_for_timeout(500)
-                                except Exception:
-                                    pass
-
-                            break  # 1商品試したら次の検索URLへ
-
-                        except Exception as e:
-                            logger.warning(f"  [{i}] エラー: {e}")
-                            try:
-                                page.keyboard.press("Escape")
-                                page.wait_for_timeout(400)
-                            except Exception:
-                                pass
-
-                    if not found_new:
-                        logger.info("  この検索結果では新規商品が見つかりませんでした")
-
-                except Exception as e:
-                    logger.warning(f"  検索URLスキップ（エラー）: {e}")
-                    try:
+                    if total_slides < 3:
+                        logger.info(f"  [{i}] 画像{total_slides}枚（不足）→ スキップ")
                         page.keyboard.press("Escape")
                         page.wait_for_timeout(500)
+                        continue
+
+                    # supplier_url 取得・重複チェック
+                    supplier_url = get_modal_supplier_url(page)
+                    norm_url = supplier_url.replace('.html', '.htm') if supplier_url else ''
+
+                    if norm_url and (norm_url in existing_urls or norm_url in session_tried):
+                        logger.info(f"  [{i}] 既知URL → スキップ: {supplier_url[:60]}")
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(500)
+                        continue
+
+                    logger.info(f"  [{i}] 新規商品 ({total_slides}枚) supplier_url={supplier_url[:60]}")
+                    if norm_url:
+                        session_tried.add(norm_url)
+
+                    # 価格チェック（上限超えはスキップ）
+                    price = get_modal_price(page)
+                    if price > args.max_price:
+                        logger.info(f"  [{i}] 価格{price}円 > {args.max_price}円 → スキップ")
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(500)
+                        continue
+                    if price > 0:
+                        logger.info(f"  [{i}] 価格チェックOK: {price}円")
+
+                    variant = PRODUCT_VARIANTS[variant_idx % len(PRODUCT_VARIANTS)]
+                    variant_idx += 1
+
+                    success, result = try_add_product(
+                        page, variant["concept"], variant["color"], variant["size"],
+                        dry_run=args.dry_run
+                    )
+
+                    if success:
+                        added_count += 1
+                        if norm_url:
+                            existing_urls.add(norm_url)
+                        logger.info(f"✓✓✓ {added_count}/{args.count}件目 追加完了！（{result}）")
+                        try:
+                            page.screenshot(path=f"logs/added_{added_count:02d}.png", full_page=True)
+                        except Exception:
+                            pass
+                        # モーダルを確実に閉じてから次へ
+                        try:
+                            page.keyboard.press("Escape")
+                            page.wait_for_timeout(800)
+                            page.locator('[role="dialog"]').wait_for(state="hidden", timeout=3_000)
+                        except Exception:
+                            pass
+                        logger.info(f"  → 次の商品へ ({added_count}/{args.count}件完了)")
+                    else:
+                        logger.warning(f"  失敗: {result}")
+                        try:
+                            page.keyboard.press("Escape")
+                            page.wait_for_timeout(500)
+                        except Exception:
+                            pass
+
+                except Exception as e:
+                    logger.warning(f"  [{i}] エラー: {e}")
+                    try:
+                        page.keyboard.press("Escape")
+                        page.wait_for_timeout(400)
                     except Exception:
                         pass
 
