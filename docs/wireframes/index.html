@@ -33,13 +33,72 @@
     </div>
   </header>
 
-  <!-- ヒーロー -->
-  <section class="px-4 md:px-6 py-10 md:py-16 text-center border-b border-gray-200">
-    <h1 class="text-2xl md:text-4xl font-serif font-bold mb-3 leading-snug">本物だけを、<br class="md:hidden">本音のレビューで。</h1>
-    <p class="text-xs md:text-base text-gray-600 mb-6 px-2">ブランド公式・百貨店EC・鑑定付きマーケットから。偽物ゼロのバッグ選び。</p>
-    <div class="max-w-xl mx-auto flex gap-0">
-      <input type="text" placeholder="ブランド・商品名" class="border rounded-l px-3 md:px-4 py-2 md:py-3 flex-1 bg-white text-sm">
-      <button class="bg-rose-500 text-white px-4 md:px-6 py-2 md:py-3 rounded-r text-sm">検索</button>
+  <!-- ヒーローバナー -->
+  <section class="px-4 md:px-6 pt-4 md:pt-6">
+    <div class="relative h-56 md:h-80 rounded-lg overflow-hidden flex items-end" style="background: linear-gradient(135deg, #FFF1F2 0%, #FFE4E6 40%, #FECDD3 100%);">
+      <div class="ph absolute inset-0 opacity-30">[ バッグのヒーロー画像 ]</div>
+      <div class="absolute top-3 md:top-6 left-4 md:left-8">
+        <span class="text-[10px] md:text-xs bg-white/90 text-rose-700 font-bold px-2 py-1 rounded shadow-sm">🎯 1,234ブランド・12,345件の口コミ</span>
+      </div>
+      <div class="relative p-4 md:p-8 text-white w-full" style="background: linear-gradient(to top, rgba(0,0,0,0.55), transparent);">
+        <div class="text-xl md:text-3xl font-bold leading-snug drop-shadow">
+          リアルに使ってる人の声で、<br>次のバッグを選ぶ。
+        </div>
+        <div class="text-xs md:text-sm mt-2 opacity-90">@cosme のバッグ版。ブランド公式・百貨店からしか買えない安心設計。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 検索 + 人気キーワード -->
+  <section class="px-4 md:px-6 pt-4 md:pt-6">
+    <div class="max-w-2xl mx-auto flex">
+      <input type="text" placeholder="例) 土屋鞄 / COACH / A4 入るトート / 通勤リュック" class="border rounded-l px-3 md:px-4 py-2.5 md:py-3 flex-1 bg-white text-xs md:text-sm">
+      <button class="bg-rose-500 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-r text-xs md:text-sm font-bold">🔍 検索</button>
+    </div>
+    <div class="max-w-2xl mx-auto mt-2 md:mt-3 flex flex-wrap items-center gap-1.5 md:gap-2 text-[11px] md:text-xs">
+      <span class="text-gray-500">人気:</span>
+      <a href="#" class="bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full">#A4トート</a>
+      <a href="#" class="bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full">#通勤バッグ</a>
+      <a href="#" class="bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full">#軽い</a>
+      <a href="#" class="bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full">#土屋鞄</a>
+      <a href="#" class="bg-rose-50 text-rose-700 px-2 py-0.5 rounded-full">#マザーズバッグ</a>
+    </div>
+  </section>
+
+  <!-- カテゴリタイル -->
+  <section class="px-4 md:px-6 py-6 md:py-8">
+    <h2 class="text-base md:text-xl font-bold mb-3 md:mb-4">カテゴリから探す</h2>
+    <div class="grid grid-cols-3 md:grid-cols-6 gap-2 md:gap-3">
+      <a href="category.html" class="flex flex-col items-center justify-center bg-rose-50 rounded-lg p-3 md:p-4 hover:bg-rose-100">
+        <div class="text-2xl md:text-3xl">🛍️</div>
+        <div class="text-xs md:text-sm font-bold mt-1">トート</div>
+        <div class="text-[10px] text-gray-500">1,234</div>
+      </a>
+      <a href="category.html" class="flex flex-col items-center justify-center bg-rose-50 rounded-lg p-3 md:p-4 hover:bg-rose-100">
+        <div class="text-2xl md:text-3xl">👜</div>
+        <div class="text-xs md:text-sm font-bold mt-1">ショルダー</div>
+        <div class="text-[10px] text-gray-500">856</div>
+      </a>
+      <a href="category.html" class="flex flex-col items-center justify-center bg-rose-50 rounded-lg p-3 md:p-4 hover:bg-rose-100">
+        <div class="text-2xl md:text-3xl">🎒</div>
+        <div class="text-xs md:text-sm font-bold mt-1">リュック</div>
+        <div class="text-[10px] text-gray-500">432</div>
+      </a>
+      <a href="category.html" class="flex flex-col items-center justify-center bg-rose-50 rounded-lg p-3 md:p-4 hover:bg-rose-100">
+        <div class="text-2xl md:text-3xl">💼</div>
+        <div class="text-xs md:text-sm font-bold mt-1">ビジネス</div>
+        <div class="text-[10px] text-gray-500">312</div>
+      </a>
+      <a href="category.html" class="flex flex-col items-center justify-center bg-rose-50 rounded-lg p-3 md:p-4 hover:bg-rose-100">
+        <div class="text-2xl md:text-3xl">👛</div>
+        <div class="text-xs md:text-sm font-bold mt-1">ミニ</div>
+        <div class="text-[10px] text-gray-500">178</div>
+      </a>
+      <a href="category.html" class="flex flex-col items-center justify-center bg-rose-50 rounded-lg p-3 md:p-4 hover:bg-rose-100">
+        <div class="text-2xl md:text-3xl">🧳</div>
+        <div class="text-xs md:text-sm font-bold mt-1">旅行</div>
+        <div class="text-[10px] text-gray-500">98</div>
+      </a>
     </div>
   </section>
 
