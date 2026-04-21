@@ -83,17 +83,12 @@ def login(page) -> None:
 def download_and_load_csv(page) -> set:
     """
     管理画面から最新CSVをダウンロードして、supplier_urlを読み込む。
-    手順: 商品一覧 → CSVエクスポート → モーダル → 商品データCSVエクスポート → ダウンロード完了待ち
+    手順: 商品一覧 → CSVエクスポート → モーダル内「商品データを全てCSVにエクスポート」
+         横のボタン（1番目）をクリック → Playwrightのdownloadイベントで受信
     """
-    import glob
-
     logger.info("最新CSVをダウンロード中...")
     page.goto(ITEM_LIST_URL, wait_until="networkidle")
     page.wait_for_timeout(3000)
-
-    # ダウンロード前のCSVファイル一覧を記録
-    pattern = str(Path.home() / "Downloads" / "item_sacoche-sacolla*.csv")
-    before_files = set(glob.glob(pattern))
 
     # 1. 「CSVエクスポート」ボタンをクリック → モーダル表示
     try:
@@ -101,50 +96,41 @@ def download_and_load_csv(page) -> set:
         csv_btn.wait_for(state="visible", timeout=15_000)
         csv_btn.click(timeout=10_000)
         logger.info("  CSVエクスポートボタンをクリック")
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(1500)
     except Exception as e:
         logger.warning(f"  CSVエクスポートボタンクリック失敗: {e}")
-        logger.info("  Downloadsフォルダの最新CSVを使用します")
-        all_files = sorted(glob.glob(pattern), key=lambda f: Path(f).stat().st_mtime, reverse=True)
-        if all_files:
-            return _load_urls_from_csv(Path(all_files[0]))
         return set()
 
-    # 2. モーダル内の「商品データを全てCSVにエクスポート」の横の「CSVエクスポート」をクリック
+    # 2. モーダル内の「商品データを全てCSVにエクスポート」横のボタン（1番目）をクリック
+    #    2番目は「商品購入オプションデータ」で別物なので使わない。
     try:
-        # モーダルが出るまで待つ
         page.locator('text=商品データを全てCSVにエクスポート').wait_for(timeout=5_000)
-        modal_btns = page.locator('button:has-text("CSVエクスポート")').all()
-        # 2番目のボタン（モーダル内の商品データ用）
-        if len(modal_btns) >= 2:
-            modal_btns[1].click()
-        else:
-            modal_btns[0].click()
-        logger.info("  モーダル内CSVエクスポートをクリック")
+        modal_btns = page.locator(
+            '[role="dialog"][data-state="open"] button:has-text("CSVエクスポート")'
+        ).all()
+        if not modal_btns:
+            logger.warning("  モーダル内にCSVエクスポートボタンなし")
+            page.keyboard.press("Escape")
+            return set()
+
+        # 1番目の「CSVエクスポート」 = 商品データ本体
+        target_btn = modal_btns[0]
+        download_path = Path.home() / "Downloads" / "item_sacoche-sacolla.csv"
+        try:
+            with page.expect_download(timeout=60_000) as dl_info:
+                target_btn.click()
+                logger.info("  モーダル内「商品データ」CSVエクスポートをクリック")
+            download = dl_info.value
+            download.save_as(str(download_path))
+            logger.info(f"  CSVダウンロード完了: {download_path} ({download_path.stat().st_size} bytes)")
+        except Exception as e:
+            logger.warning(f"  ダウンロード失敗: {e}")
+            page.keyboard.press("Escape")
+            return set()
     except Exception as e:
-        logger.warning(f"  モーダル内ボタンクリック失敗: {e}")
+        logger.warning(f"  モーダル操作失敗: {e}")
         page.keyboard.press("Escape")
-        all_files = sorted(glob.glob(pattern), key=lambda f: Path(f).stat().st_mtime, reverse=True)
-        if all_files:
-            return _load_urls_from_csv(Path(all_files[0]))
         return set()
-
-    # 3. ダウンロード完了を待つ（新しいCSVファイルが出現するまで）
-    logger.info("  ダウンロード待機中...")
-    csv_path = None
-    for _ in range(60):  # 最大60秒
-        time.sleep(1)
-        after_files = set(glob.glob(pattern))
-        new_files = after_files - before_files
-        if new_files:
-            csv_path = Path(sorted(new_files, key=lambda f: Path(f).stat().st_mtime, reverse=True)[0])
-            logger.info(f"  CSVダウンロード完了: {csv_path}")
-            break
-
-    if not csv_path:
-        logger.warning("  ダウンロードタイムアウト、最新CSVを使用")
-        all_files = sorted(glob.glob(pattern), key=lambda f: Path(f).stat().st_mtime, reverse=True)
-        csv_path = Path(all_files[0]) if all_files else None
 
     # モーダルを閉じる
     try:
@@ -153,11 +139,7 @@ def download_and_load_csv(page) -> set:
     except Exception:
         pass
 
-    if not csv_path:
-        logger.warning("  CSVが見つかりません、重複チェックなしで続行")
-        return set()
-
-    return _load_urls_from_csv(csv_path)
+    return _load_urls_from_csv(download_path)
 
 
 def _load_urls_from_csv(csv_path: Path) -> set:
@@ -421,7 +403,11 @@ def main():
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=HEADLESS)
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        ctx = browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            accept_downloads=True,
+        )
+        page = ctx.new_page()
 
         try:
             login(page)
