@@ -12,7 +12,8 @@
     python article_retry.py --dry-run
     python article_retry.py --count 3
 """
-import argparse, logging, re, sys, time
+from __future__ import annotations
+import argparse, logging, os, re, sys, time
 from pathlib import Path
 
 logging.basicConfig(
@@ -24,12 +25,13 @@ logger = logging.getLogger(__name__)
 
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
-from config import ADMIN_USER, ADMIN_PASS
+from config import ADMIN_USER, ADMIN_PASS, HEADLESS
 from add_five import login
 
 LOGS = Path("logs"); LOGS.mkdir(exist_ok=True)
 BASE = "https://sacoche-sacolla.flumo-admin-server.com"
 SEO_ARTICLE_URL = f"{BASE}/seo_article"
+_AUTO = os.getenv("AUTO", "0") == "1"
 
 
 def get_target_articles(page) -> list[dict]:
@@ -227,14 +229,24 @@ def retry_single_article(page, article: dict, dry_run: bool) -> bool:
     except Exception as e:
         logger.warning(f"  タイトル変更失敗: {e}")
 
-    # 「更新」ボタンをクリック
+    # 「更新」ボタンをクリック（モーダル内のform submit=本来の更新ボタン）
     try:
-        update_btn = page.locator('button:has-text("更新")')
-        update_btn.click()
+        update_btn = page.locator('form button[type="submit"]:has-text("更新")').first
+        update_btn.scroll_into_view_if_needed()
+        page.wait_for_timeout(500)
+        try:
+            update_btn.click(timeout=5_000)
+        except Exception as click_err:
+            logger.info(f"  通常click失敗、force=Trueで再試行: {click_err}")
+            update_btn.click(force=True, timeout=5_000)
         logger.info("  「更新」をクリック")
         page.wait_for_timeout(5000)
     except Exception as e:
         logger.warning(f"  更新ボタンクリック失敗: {e}")
+        try:
+            page.screenshot(path=f"logs/article_update_fail_{article['id']}.png", full_page=True)
+        except Exception:
+            pass
         return False
 
     logger.info(f"  ✓ 記事リトライ完了: {article['title']} → {new_label}")
@@ -257,7 +269,7 @@ def main():
     retried_count = 0
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False)
+        browser = pw.chromium.launch(headless=HEADLESS)
         page = browser.new_page(viewport={"width": 1280, "height": 900})
 
         try:
@@ -298,11 +310,14 @@ def main():
             logger.info(f"\n{'='*50}")
             logger.info(f"完了: {retried_count}/{args.count}件 リトライしました")
             logger.info(f"{'='*50}")
-            logger.info("\nブラウザはそのまま開いています。")
-            try:
-                input("Enterキーで終了...")
-            except (EOFError, KeyboardInterrupt):
-                pass
+            if _AUTO:
+                logger.info("\nAUTOモード: ブラウザを閉じます。")
+            else:
+                logger.info("\nブラウザはそのまま開いています。")
+                try:
+                    input("Enterキーで終了...")
+                except (EOFError, KeyboardInterrupt):
+                    pass
             browser.close()
 
 

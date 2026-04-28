@@ -3,6 +3,7 @@
 
 NOTE: セレクタは管理画面に合わせて調整してください。
 """
+from __future__ import annotations
 import logging
 from playwright.sync_api import Page, TimeoutError as PWTimeout
 from config import ADMIN_URL
@@ -11,11 +12,11 @@ logger = logging.getLogger(__name__)
 
 # ─── 要調整: 検索フォームのセレクタ ────────────────────
 # 管理画面内の「商品検索」または「Alibaba商品DB」ページURL（ログイン後の相対パス）
-SEARCH_PAGE_PATH = "/products/alibaba-search"   # 例: /products/alibaba-search
+SEARCH_PAGE_PATH = "/item/search"
 
-SEL_SEARCH_INPUT  = 'input[placeholder*="検索"], input[name="keyword"], input[type="search"]'
-SEL_SEARCH_BUTTON = 'button[type="submit"], button:has-text("検索")'
-SEL_RESULT_ROW    = 'table tbody tr, .product-item, [class*="product-row"]'
+SEL_SEARCH_INPUT  = 'input[placeholder*="パーカー"], input[placeholder*="例:"]'
+SEL_SEARCH_BUTTON = 'button:has-text("検索開始")'
+SEL_RESULT_ROW    = '[class*="product"], [class*="item-card"], [class*="grid"] > div, table tbody tr'
 # ─────────────────────────────────────────────────────
 
 

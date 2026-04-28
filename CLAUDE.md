@@ -52,6 +52,21 @@ python main.py --step login
 各steps/*.pyファイルの先頭にある `SEL_*` 変数は管理画面のCSSセレクタ。
 管理画面のHTMLが変更された場合は probe.py を実行して最新のセレクタを確認し、該当ファイルを更新する。
 
+## 標準ワークフロー（最優先で従うこと）
+
+「商品追加して」「リッチ化して」と頼まれたら以下を実行する。確認は不要。
+
+```bash
+cd ~/Desktop/ec_auto_sourcing && source .venv/bin/activate
+AUTO=1 python add_netsea.py --count N        # 商品追加（必ずNetsea。add_five.pyは使わない）
+AUTO=1 python enrich_products.py --count N   # リッチ化
+```
+
+**重要**:
+- 商品追加は **必ず `add_netsea.py`**（Netsea検索）。`add_five.py`（Taobao/Alibaba）は使わない
+- 件数指定がない場合のデフォルト: 商品追加=10件、リッチ化=5件
+- スラッシュコマンド `/add N` `/enrich N` `/sourcing N M` でも実行可能
+
 ## タスク実行時の注意
 
 - **初回実行時**: まず `python probe.py` でログイン〜検索の動作確認をする。スクリーンショットが logs/ に保存されるので、セレクタが合っているか確認。合っていなければ steps/ 内の SEL_* を修正。

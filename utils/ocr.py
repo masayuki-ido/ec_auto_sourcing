@@ -1,6 +1,7 @@
 """
 EasyOCR を使った画像テキスト検出ユーティリティ
 """
+from __future__ import annotations
 import logging
 import io
 from pathlib import Path

@@ -1,0 +1,12 @@
+{
+  "ids": [
+    "429",
+    "49",
+    "111"
+  ],
+  "reasons": {
+    "429": "modal_timeout",
+    "49": "out_of_stock",
+    "111": "modal_timeout"
+  }
+}

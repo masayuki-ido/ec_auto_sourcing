@@ -13,6 +13,7 @@
     python add_five.py --count 3
     python add_five.py --csv /path/to/items.csv
 """
+from __future__ import annotations
 import argparse, logging, re, sys, csv, time, threading, http.server, socketserver
 from pathlib import Path
 from io import BytesIO
@@ -29,10 +30,27 @@ import requests
 from PIL import Image
 import numpy as np
 
-from config import ADMIN_USER, ADMIN_PASS
+from config import ADMIN_USER, ADMIN_PASS, HEADLESS
+import os
+from datetime import datetime
 LOGS = Path("logs"); LOGS.mkdir(exist_ok=True)
 BASE = "https://sacoche-sacolla.flumo-admin-server.com"
 DEFAULT_CSV = Path.home() / "Downloads" / "item_sacoche-sacolla.csv"
+
+# スクショ保存ディレクトリ（run単位）
+SHOT_DIR = LOGS / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+SHOT_DIR.mkdir(parents=True, exist_ok=True)
+_shot_counter = {"n": 0}
+_AUTO = os.getenv("AUTO", "0") == "1"
+
+def snap(page, label: str) -> None:
+    _shot_counter["n"] += 1
+    path = SHOT_DIR / f"{_shot_counter['n']:03d}_{label}.png"
+    try:
+        page.screenshot(path=str(path), full_page=True)
+        logger.info(f"[SHOT] {path}")
+    except Exception as e:
+        logger.warning(f"スクショ失敗 {label}: {e}")
 
 
 CATEGORY_ORDER = [
@@ -580,17 +598,20 @@ def main():
     local_server = None   # finally で参照するため外側で初期化
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False)
+        browser = pw.chromium.launch(headless=HEADLESS)
         page = browser.new_page(viewport={"width": 1280, "height": 900})
 
         try:
             login(page)
+            snap(page, "after_login")
 
             # キーワード検索で商品一覧を取得
             logger.info(f"\nキーワード「{args.keyword}」で検索します...")
             if not search_products(page, args.keyword):
                 logger.error("検索に失敗しました。終了します。")
+                snap(page, "search_failed")
                 return
+            snap(page, f"search_results_{args.keyword}")
 
             detail_locator = page.locator('button:has-text("詳細を見る")')
             total_btns = detail_locator.count()
@@ -613,14 +634,16 @@ def main():
                     btn.click()
                     page.wait_for_selector('[role="dialog"]', timeout=8_000)
                     page.wait_for_timeout(1500)
+                    snap(page, f"modal_open_cand_{i+1}")
 
                     # 画像枚数チェック
                     modal_text = page.locator('[role="dialog"]').inner_text()
                     slide_m = re.search(r'(\d+)/(\d+)', modal_text)
                     total_slides = int(slide_m.group(2)) if slide_m else 0
 
-                    if total_slides < 3:
-                        logger.info(f"  [{i}] 画像{total_slides}枚（不足）→ スキップ")
+                    min_slides = int(os.getenv("MIN_SLIDES", "1"))
+                    if total_slides < min_slides:
+                        logger.info(f"  [{i}] 画像{total_slides}枚（不足<{min_slides}）→ スキップ")
                         page.keyboard.press("Escape")
                         page.wait_for_timeout(500)
                         continue
@@ -662,10 +685,7 @@ def main():
                         if norm_url:
                             existing_urls.add(norm_url)
                         logger.info(f"✓✓✓ {added_count}/{args.count}件目 追加完了！（{result}）")
-                        try:
-                            page.screenshot(path=f"logs/added_{added_count:02d}.png", full_page=True)
-                        except Exception:
-                            pass
+                        snap(page, f"added_{added_count:02d}")
                         # モーダルを確実に閉じてから次へ
                         try:
                             page.keyboard.press("Escape")
@@ -692,7 +712,10 @@ def main():
 
         except Exception as e:
             logger.error(f"予期しないエラー: {e}", exc_info=True)
-            page.screenshot(path="logs/unexpected_error.png")
+            try:
+                snap(page, "unexpected_error")
+            except Exception:
+                pass
 
         finally:
             try:
@@ -702,11 +725,14 @@ def main():
             logger.info(f"\n{'='*50}")
             logger.info(f"完了: {added_count}/{args.count}件 追加しました")
             logger.info(f"{'='*50}")
-            logger.info("\nブラウザはそのまま開いています。")
-            try:
-                input("Enterキーで終了...")
-            except (EOFError, KeyboardInterrupt):
-                pass
+            if _AUTO:
+                logger.info("\nAUTOモード: ブラウザを閉じて終了します。")
+            else:
+                logger.info("\nブラウザはそのまま開いています。")
+                try:
+                    input("Enterキーで終了...")
+                except (EOFError, KeyboardInterrupt):
+                    pass
             browser.close()
 
 
