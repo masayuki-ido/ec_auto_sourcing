@@ -16,6 +16,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 from config import ADMIN_URL, ADMIN_USER, ADMIN_PASS, HEADLESS
+import os
+_AUTO = os.getenv("PROBE_AUTO", "0") == "1"
 LOGS = Path("logs")
 LOGS.mkdir(exist_ok=True)
 
@@ -74,7 +76,7 @@ def main():
     logger.info("=== 管理画面 構造調査 開始 ===")
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False)  # 画面を表示して確認
+        browser = pw.chromium.launch(headless=HEADLESS)
         page = browser.new_page(viewport={"width": 1280, "height": 900})
 
         # ── Step 1: ログインページ ──
@@ -189,10 +191,11 @@ def main():
         )
 
         # ブラウザを開いたまま待機（手動確認用）
-        try:
-            input("Enterキーで終了...")
-        except (KeyboardInterrupt, EOFError):
-            pass
+        if not _AUTO:
+            try:
+                input("Enterキーで終了...")
+            except (KeyboardInterrupt, EOFError):
+                pass
 
         browser.close()
     logger.info("=== 終了 ===")

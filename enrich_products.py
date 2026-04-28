@@ -14,7 +14,8 @@
     python enrich_products.py --dry-run
     python enrich_products.py --count 3
 """
-import argparse, logging, re, sys, time
+from __future__ import annotations
+import argparse, json, logging, os, re, sys, time
 from pathlib import Path
 from io import BytesIO
 
@@ -30,12 +31,46 @@ import requests
 from PIL import Image
 import numpy as np
 
-from config import ADMIN_USER, ADMIN_PASS
+from config import ADMIN_USER, ADMIN_PASS, HEADLESS
 from add_five import login, is_usable_image, get_slide_img_urls
 
 LOGS = Path("logs"); LOGS.mkdir(exist_ok=True)
 BASE = "https://sacoche-sacolla.flumo-admin-server.com"
 ENRICHMENT_URL = f"{BASE}/item/enrichment?sortBy=session&sortOrder=desc"
+SKIP_FILE = Path("enrich_skip.json")
+_AUTO = os.getenv("AUTO", "0") == "1"
+
+
+def load_skip_ids() -> set[str]:
+    """スキップ対象の商品IDを読み込む"""
+    if not SKIP_FILE.exists():
+        return set()
+    try:
+        data = json.loads(SKIP_FILE.read_text(encoding="utf-8"))
+        return set(str(x) for x in data.get("ids", []))
+    except Exception as e:
+        logger.warning(f"スキップリスト読み込み失敗: {e}")
+        return set()
+
+
+def add_skip_id(item_id: str, reason: str) -> None:
+    """商品IDをスキップリストに追加"""
+    item_id = str(item_id)
+    data = {"ids": [], "reasons": {}}
+    if SKIP_FILE.exists():
+        try:
+            data = json.loads(SKIP_FILE.read_text(encoding="utf-8"))
+            data.setdefault("ids", [])
+            data.setdefault("reasons", {})
+        except Exception:
+            pass
+    if item_id not in data["ids"]:
+        data["ids"].append(item_id)
+    data["reasons"][item_id] = reason
+    SKIP_FILE.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    logger.info(f"  → スキップリストに追加: ID {item_id} ({reason})")
 
 
 def get_unenriched_items(page) -> list[dict]:
@@ -80,64 +115,70 @@ def get_unenriched_items(page) -> list[dict]:
 
 def select_enrichment_images(page, modal) -> int:
     """
-    モーダル内のカルーセル画像から適切な画像を2~4枚選択する。
+    モーダル内のカルーセル画像から3~4枚を「説明画像に追加」ボタンで選択する。
+    フロー: サムネイルクリック→メイン画像切替→「説明画像に追加」クリック を繰り返す。
     画像フィルタリング（中国語テキスト除外・空白除外）を適用。
-    Returns: 選択した画像数
+    Returns: 追加した画像数
     """
-    # サムネイル画像を取得
-    thumbnails = modal.locator("img").all()
-    logger.info(f"  モーダル内画像数: {len(thumbnails)}")
+    target_min, target_max = 3, 4
 
-    # 既に選択されている画像数を確認
-    selected_count = len(modal.locator('button:has-text("↑"), button:has-text("↓")').all()) // 2
-    if selected_count == 0:
-        # 削除ボタンの数で判断
-        delete_btns = modal.locator('[class*="trash"], button:has-text("削除")').all()
-        selected_count = len(delete_btns)
-
-    logger.info(f"  既に選択済み画像数: {selected_count}")
-
-    # カルーセルのサムネイル（右側のサムネイル列）をクリックして画像を選択
-    # まず、選択可能なサムネイルを探す
-    right_thumbnails = modal.locator('img[class*="cursor"], img[class*="thumbnail"], img[class*="thumb"]').all()
-    if not right_thumbnails:
-        # フォールバック: モーダル右側の小さな画像
-        right_thumbnails = modal.locator('img').all()
-
-    img_urls = []
-    for thumb in right_thumbnails:
-        src = thumb.get_attribute("src") or ""
-        if src and src.startswith("http"):
-            img_urls.append(src)
-
-    # フィルタリングして適切な画像を選択
-    usable_indices = []
-    for idx, url in enumerate(img_urls):
-        if len(usable_indices) >= 4:
-            break
-        if is_usable_image(url):
-            usable_indices.append(idx)
-            logger.info(f"    [{idx}] OK: {url[-50:]}")
-        else:
-            logger.info(f"    [{idx}] NG: {url[-50:]}")
-
-    if not usable_indices:
-        logger.warning("  フィルタ通過画像なし → 最初の3枚を使用")
-        usable_indices = list(range(min(3, len(right_thumbnails))))
-
-    # 必要な枚数（2~4枚）を選択
-    target_count = max(2, min(4, len(usable_indices)))
-    selected = usable_indices[:target_count]
-
-    for idx in selected:
+    # モーダル内の全imgからサムネイル候補を抽出（http始まりかつユニーク）
+    all_imgs = modal.locator("img").all()
+    seen_src = set()
+    candidates = []  # [(locator, src), ...]
+    for img in all_imgs:
         try:
-            right_thumbnails[idx].click()
-            page.wait_for_timeout(500)
-        except Exception as e:
-            logger.warning(f"    画像クリック失敗 [{idx}]: {e}")
+            src = img.get_attribute("src") or ""
+        except Exception:
+            continue
+        if not src.startswith("http"):
+            continue
+        if src in seen_src:
+            continue
+        seen_src.add(src)
+        candidates.append((img, src))
 
-    logger.info(f"  画像選択完了: {len(selected)}枚")
-    return len(selected)
+    logger.info(f"  ユニーク画像候補: {len(candidates)}枚")
+
+    selected_count = 0
+    for idx, (thumb, src) in enumerate(candidates):
+        if selected_count >= target_max:
+            break
+
+        if not is_usable_image(src):
+            logger.info(f"    [{idx}] NG: {src[-50:]}")
+            continue
+        logger.info(f"    [{idx}] OK: {src[-50:]}")
+
+        # サムネイルをクリックしてメイン画像を切り替え
+        try:
+            thumb.scroll_into_view_if_needed(timeout=3000)
+            thumb.click(timeout=5000)
+            page.wait_for_timeout(400)
+        except Exception as e:
+            logger.warning(f"    [{idx}] サムネイルクリック失敗: {e}")
+            continue
+
+        # 「説明画像に追加」ボタンをクリック
+        try:
+            add_btn = modal.get_by_text("説明画像に追加").first
+            add_btn.scroll_into_view_if_needed(timeout=3000)
+            try:
+                add_btn.click(timeout=5000)
+            except Exception:
+                add_btn.click(force=True, timeout=5000)
+            page.wait_for_timeout(500)
+            selected_count += 1
+            logger.info(f"    [{idx}] ✓ 追加 ({selected_count}枚目)")
+        except Exception as e:
+            logger.warning(f"    [{idx}] 「説明画像に追加」クリック失敗: {e}")
+            continue
+
+    if selected_count < target_min:
+        logger.warning(f"  選択数不足: {selected_count}枚 (目標 {target_min}枚以上)")
+
+    logger.info(f"  画像選択完了: {selected_count}枚")
+    return selected_count
 
 
 def enrich_single_product(page, item: dict, dry_run: bool) -> bool:
@@ -181,6 +222,7 @@ def enrich_single_product(page, item: dict, dry_run: bool) -> bool:
     except PWTimeout:
         logger.warning("  モーダル表示タイムアウト（60秒）")
         page.screenshot(path=f"logs/enrich_timeout_{item['id']}.png")
+        add_skip_id(item["id"], "modal_timeout")
         try:
             page.keyboard.press("Escape")
         except Exception:
@@ -202,10 +244,26 @@ def enrich_single_product(page, item: dict, dry_run: bool) -> bool:
 
     # 「リッチ化文章を生成する」をクリック
     try:
-        gen_btn = page.locator('button:has-text("リッチ化文章を生成する")')
+        gen_btn = page.locator('button:has-text("リッチ化文章を生成する")').first
         gen_btn.scroll_into_view_if_needed()
-        page.wait_for_timeout(300)
-        gen_btn.click()
+        page.wait_for_timeout(500)
+        # ボタンがenabledになるまで最大60秒待機
+        try:
+            page.wait_for_function(
+                """() => {
+                    const btns = Array.from(document.querySelectorAll('button'));
+                    const b = btns.find(x => x.textContent && x.textContent.includes('リッチ化文章を生成する'));
+                    return b && !b.disabled;
+                }""",
+                timeout=60_000,
+            )
+        except PWTimeout:
+            logger.info("  生成ボタンenabled待機タイムアウト → force=Trueで試行")
+        try:
+            gen_btn.click(timeout=10_000)
+        except Exception as click_err:
+            logger.info(f"  通常click失敗、force=Trueで再試行: {click_err}")
+            gen_btn.click(force=True, timeout=10_000)
         logger.info("  「リッチ化文章を生成する」をクリック")
     except Exception as e:
         logger.warning(f"  文章生成ボタンクリック失敗: {e}")
@@ -249,12 +307,22 @@ def enrich_single_product(page, item: dict, dry_run: bool) -> bool:
         page.keyboard.press("Escape")
         page.wait_for_timeout(1000)
 
-    # ページ最下部の「更新」ボタンをクリック
+    # モーダルが完全に消えるまで待機（最大10秒）
     try:
-        update_btn = page.locator('button:has-text("更新")')
-        update_btn.scroll_into_view_if_needed()
+        page.locator('[role="dialog"]').first.wait_for(state="hidden", timeout=10_000)
+    except Exception:
+        pass
+
+    # ページ最下部の「更新」ボタンをクリック（form内のsubmitボタン）
+    try:
+        update_btn = page.locator('form button[type="submit"]:has-text("更新")').first
+        update_btn.scroll_into_view_if_needed(timeout=60_000)
         page.wait_for_timeout(500)
-        update_btn.click()
+        try:
+            update_btn.click(timeout=10_000)
+        except Exception as click_err:
+            logger.info(f"  通常click失敗、force=Trueで再試行: {click_err}")
+            update_btn.click(force=True, timeout=10_000)
         logger.info("  「更新」をクリック")
         page.wait_for_timeout(3000)
     except Exception as e:
@@ -282,7 +350,7 @@ def main():
     enriched_count = 0
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False)
+        browser = pw.chromium.launch(headless=HEADLESS)
         page = browser.new_page(viewport={"width": 1280, "height": 900})
 
         try:
@@ -295,24 +363,43 @@ def main():
                 logger.info("リッチ化未対応の商品はありません")
                 return
 
-            # 上から順に処理
-            for item in items[:args.count]:
+            # スキップリストを除外
+            skip_ids = load_skip_ids()
+            if skip_ids:
+                before = len(items)
+                items = [it for it in items if str(it["id"]) not in skip_ids]
+                logger.info(f"スキップリスト適用: {before} → {len(items)}件 (除外 {before - len(items)}件)")
+
+            # 上から順に処理（成功カウントが目標に達するまで継続）
+            consecutive_errors = 0
+            for item in items:
+                if enriched_count >= args.count:
+                    break
+                # ページが閉じられていたら中断
+                if page.is_closed():
+                    logger.error("ページが閉じられました。処理を中断します")
+                    break
                 try:
                     success = enrich_single_product(page, item, dry_run=args.dry_run)
                     if success:
                         enriched_count += 1
+                        consecutive_errors = 0
                         logger.info(f"✓✓✓ {enriched_count}/{args.count}件 リッチ化完了")
                     else:
                         logger.warning(f"  商品 {item['id']} のリッチ化に失敗")
+                        consecutive_errors += 1
                 except Exception as e:
                     logger.error(f"  商品 {item['id']} 処理中にエラー: {e}")
+                    consecutive_errors += 1
                     try:
-                        page.keyboard.press("Escape")
-                        page.wait_for_timeout(1000)
+                        if not page.is_closed():
+                            page.keyboard.press("Escape")
+                            page.wait_for_timeout(1000)
                     except Exception:
                         pass
 
-                if enriched_count >= args.count:
+                if consecutive_errors >= 5:
+                    logger.error(f"連続エラー {consecutive_errors}件、処理を中断します")
                     break
 
         except Exception as e:
@@ -323,11 +410,14 @@ def main():
             logger.info(f"\n{'='*50}")
             logger.info(f"完了: {enriched_count}/{args.count}件 リッチ化しました")
             logger.info(f"{'='*50}")
-            logger.info("\nブラウザはそのまま開いています。")
-            try:
-                input("Enterキーで終了...")
-            except (EOFError, KeyboardInterrupt):
-                pass
+            if _AUTO:
+                logger.info("\nAUTOモード: ブラウザを閉じます。")
+            else:
+                logger.info("\nブラウザはそのまま開いています。")
+                try:
+                    input("Enterキーで終了...")
+                except (EOFError, KeyboardInterrupt):
+                    pass
             browser.close()
 
 

@@ -1,6 +1,7 @@
 """
 Pillow を使った画像の主要色（ドミナントカラー）抽出ユーティリティ
 """
+from __future__ import annotations
 import io
 import math
 import logging

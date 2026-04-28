@@ -22,13 +22,29 @@ logger = logging.getLogger(__name__)
 
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
-from config import ADMIN_USER, ADMIN_PASS
+from config import ADMIN_USER, ADMIN_PASS, HEADLESS
+import os
+from datetime import datetime
 
 LOGS = Path("logs"); LOGS.mkdir(exist_ok=True)
 BASE = "https://sacoche-sacolla.flumo-admin-server.com"
 SEARCH_URL = f"{BASE}/item/search"
 ITEM_LIST_URL = f"{BASE}/item"
 CSV_DIR = Path("data"); CSV_DIR.mkdir(exist_ok=True)
+
+SHOT_DIR = LOGS / f"netsea_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+SHOT_DIR.mkdir(parents=True, exist_ok=True)
+_shot_counter = {"n": 0}
+_AUTO = os.getenv("AUTO", "0") == "1"
+
+def snap(page, label: str) -> None:
+    _shot_counter["n"] += 1
+    path = SHOT_DIR / f"{_shot_counter['n']:03d}_{label}.png"
+    try:
+        page.screenshot(path=str(path), full_page=True)
+        logger.info(f"[SHOT] {path}")
+    except Exception as e:
+        logger.warning(f"スクショ失敗 {label}: {e}")
 
 # カテゴリ自動判定マッピング（商品名・説明のキーワード → カテゴリvalue）
 CATEGORY_KEYWORDS = {
@@ -67,17 +83,12 @@ def login(page) -> None:
 def download_and_load_csv(page) -> set:
     """
     管理画面から最新CSVをダウンロードして、supplier_urlを読み込む。
-    手順: 商品一覧 → CSVエクスポート → モーダル → 商品データCSVエクスポート → ダウンロード完了待ち
+    手順: 商品一覧 → CSVエクスポート → モーダル内「商品データを全てCSVにエクスポート」
+         横のボタン（1番目）をクリック → Playwrightのdownloadイベントで受信
     """
-    import glob
-
     logger.info("最新CSVをダウンロード中...")
     page.goto(ITEM_LIST_URL, wait_until="networkidle")
     page.wait_for_timeout(3000)
-
-    # ダウンロード前のCSVファイル一覧を記録
-    pattern = str(Path.home() / "Downloads" / "item_sacoche-sacolla*.csv")
-    before_files = set(glob.glob(pattern))
 
     # 1. 「CSVエクスポート」ボタンをクリック → モーダル表示
     try:
@@ -85,50 +96,41 @@ def download_and_load_csv(page) -> set:
         csv_btn.wait_for(state="visible", timeout=15_000)
         csv_btn.click(timeout=10_000)
         logger.info("  CSVエクスポートボタンをクリック")
-        page.wait_for_timeout(2000)
+        page.wait_for_timeout(1500)
     except Exception as e:
         logger.warning(f"  CSVエクスポートボタンクリック失敗: {e}")
-        logger.info("  Downloadsフォルダの最新CSVを使用します")
-        all_files = sorted(glob.glob(pattern), key=lambda f: Path(f).stat().st_mtime, reverse=True)
-        if all_files:
-            return _load_urls_from_csv(Path(all_files[0]))
         return set()
 
-    # 2. モーダル内の「商品データを全てCSVにエクスポート」の横の「CSVエクスポート」をクリック
+    # 2. モーダル内の「商品データを全てCSVにエクスポート」横のボタン（1番目）をクリック
+    #    2番目は「商品購入オプションデータ」で別物なので使わない。
     try:
-        # モーダルが出るまで待つ
         page.locator('text=商品データを全てCSVにエクスポート').wait_for(timeout=5_000)
-        modal_btns = page.locator('button:has-text("CSVエクスポート")').all()
-        # 2番目のボタン（モーダル内の商品データ用）
-        if len(modal_btns) >= 2:
-            modal_btns[1].click()
-        else:
-            modal_btns[0].click()
-        logger.info("  モーダル内CSVエクスポートをクリック")
+        modal_btns = page.locator(
+            '[role="dialog"][data-state="open"] button:has-text("CSVエクスポート")'
+        ).all()
+        if not modal_btns:
+            logger.warning("  モーダル内にCSVエクスポートボタンなし")
+            page.keyboard.press("Escape")
+            return set()
+
+        # 1番目の「CSVエクスポート」 = 商品データ本体
+        target_btn = modal_btns[0]
+        download_path = Path.home() / "Downloads" / "item_sacoche-sacolla.csv"
+        try:
+            with page.expect_download(timeout=60_000) as dl_info:
+                target_btn.click()
+                logger.info("  モーダル内「商品データ」CSVエクスポートをクリック")
+            download = dl_info.value
+            download.save_as(str(download_path))
+            logger.info(f"  CSVダウンロード完了: {download_path} ({download_path.stat().st_size} bytes)")
+        except Exception as e:
+            logger.warning(f"  ダウンロード失敗: {e}")
+            page.keyboard.press("Escape")
+            return set()
     except Exception as e:
-        logger.warning(f"  モーダル内ボタンクリック失敗: {e}")
+        logger.warning(f"  モーダル操作失敗: {e}")
         page.keyboard.press("Escape")
-        all_files = sorted(glob.glob(pattern), key=lambda f: Path(f).stat().st_mtime, reverse=True)
-        if all_files:
-            return _load_urls_from_csv(Path(all_files[0]))
         return set()
-
-    # 3. ダウンロード完了を待つ（新しいCSVファイルが出現するまで）
-    logger.info("  ダウンロード待機中...")
-    csv_path = None
-    for _ in range(60):  # 最大60秒
-        time.sleep(1)
-        after_files = set(glob.glob(pattern))
-        new_files = after_files - before_files
-        if new_files:
-            csv_path = Path(sorted(new_files, key=lambda f: Path(f).stat().st_mtime, reverse=True)[0])
-            logger.info(f"  CSVダウンロード完了: {csv_path}")
-            break
-
-    if not csv_path:
-        logger.warning("  ダウンロードタイムアウト、最新CSVを使用")
-        all_files = sorted(glob.glob(pattern), key=lambda f: Path(f).stat().st_mtime, reverse=True)
-        csv_path = Path(all_files[0]) if all_files else None
 
     # モーダルを閉じる
     try:
@@ -137,11 +139,7 @@ def download_and_load_csv(page) -> set:
     except Exception:
         pass
 
-    if not csv_path:
-        logger.warning("  CSVが見つかりません、重複チェックなしで続行")
-        return set()
-
-    return _load_urls_from_csv(csv_path)
+    return _load_urls_from_csv(download_path)
 
 
 def _load_urls_from_csv(csv_path: Path) -> set:
@@ -307,19 +305,34 @@ def add_single_product(page, card_link, existing_urls: set, existing_names: set,
         close_modal(page)
         return True
 
-    # カテゴリを自動選択
+    # カテゴリを自動選択（モーダル内の最初のselect = カテゴリ）
     cat_value = detect_category(product_name, description)
     try:
-        cat_select = modal.locator('select').first
+        cat_select = modal.locator('select').nth(0)
         cat_select.select_option(value=cat_value)
         logger.info(f"  カテゴリ選択: value={cat_value}")
         page.wait_for_timeout(500)
     except Exception as e:
         logger.warning(f"  カテゴリ選択失敗: {e}")
 
+    # 配達情報を選択（モーダル内の2つ目のselect）
+    delivery_value = os.getenv(
+        "DELIVERY_OPTION",
+        "ご注文確定から3~7日でお届け予定"
+    )
+    try:
+        delivery_select = modal.locator('select').nth(1)
+        delivery_select.select_option(value=delivery_value)
+        logger.info(f"  配達情報選択: {delivery_value}")
+        page.wait_for_timeout(500)
+    except Exception as e:
+        logger.warning(f"  配達情報選択失敗: {e}")
+
     # 「商品を追加」ボタンをクリック
     try:
-        add_btn = modal.locator('button:has-text("商品を追加")')
+        add_btn = modal.locator('button:has-text("商品を追加")').first
+        add_btn.scroll_into_view_if_needed()
+        page.wait_for_timeout(300)
         add_btn.click(timeout=10_000)
         logger.info("  「商品を追加」をクリック")
     except Exception as e:
@@ -327,17 +340,51 @@ def add_single_product(page, card_link, existing_urls: set, existing_names: set,
         close_modal(page)
         return False
 
-    # 追加処理のバックグラウンド実行を待つ
-    # ※このUIはクリック後にモーダルが閉じないケースがあるが、
-    #   バックグラウンドで追加処理が走っている
-    page.wait_for_timeout(3000)
+    # 完了シグナルを待つ（最大60秒）
+    # モーダルが閉じる / ボタンがdisabledになる / トーストが出る のいずれか
+    deadline = 60_000
+    start = 0
+    poll = 1_000
+    success = False
+    while start < deadline:
+        page.wait_for_timeout(poll)
+        start += poll
+        try:
+            # モーダルが閉じた
+            if not page.locator('[role="dialog"]').first.is_visible():
+                logger.info(f"  モーダル消失 @ {start/1000:.0f}秒 → 追加完了")
+                success = True
+                break
+            # ボタンがdisabledに
+            if modal.locator('button:has-text("商品を追加")').first.is_disabled():
+                logger.info(f"  追加ボタンdisabled @ {start/1000:.0f}秒")
+            # モーダル内に完了メッセージ
+            modal_text = modal.inner_text()[:500]
+            if any(kw in modal_text for kw in ["追加されました", "追加完了", "successfully", "登録しました"]):
+                logger.info(f"  成功メッセージ検出 @ {start/1000:.0f}秒")
+                success = True
+                break
+        except Exception:
+            # dialog消失時の例外を成功と見なす
+            logger.info(f"  dialog操作失敗（消失済み）@ {start/1000:.0f}秒 → 追加完了")
+            success = True
+            break
 
-    # 追加成功と判定（ボタンクリックが成功した時点で処理が走る）
+    if not success:
+        logger.warning(f"  完了シグナルを{deadline/1000:.0f}秒以内に検出できず")
+        # 最後のモーダル状態をスクショに記録
+        try:
+            snap(page, f"no_complete_signal")
+        except Exception:
+            pass
+        close_modal(page)
+        return False
+
     logger.info(f"  ✓ 追加成功: {product_name[:50]}")
     if product_url:
         existing_urls.add(product_url)
 
-    # モーダルを閉じる
+    # モーダルを閉じる（まだ開いていれば）
     close_modal(page)
     return True
 
@@ -355,17 +402,27 @@ def main():
     added_count = 0
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=False)
-        page = browser.new_page(viewport={"width": 1280, "height": 900})
+        browser = pw.chromium.launch(headless=HEADLESS)
+        ctx = browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            accept_downloads=True,
+        )
+        page = ctx.new_page()
 
         try:
             login(page)
+            snap(page, "after_login")
 
             # 最新CSVをダウンロードして重複チェック
-            existing_urls = download_and_load_csv(page)
+            if os.getenv("SKIP_CSV", "0") == "1":
+                logger.info("SKIP_CSV=1: CSVダウンロードをスキップ")
+                existing_urls = set()
+            else:
+                existing_urls = download_and_load_csv(page)
             existing_names = set()  # 商品名重複チェック用
 
             search_netsea(page, args.keyword)
+            snap(page, f"search_{args.keyword}")
 
             page_num = 1
             card_idx = 0  # 現在のカードインデックス
@@ -402,10 +459,7 @@ def main():
                     if success:
                         added_count += 1
                         logger.info(f"  ✓✓✓ {added_count}/{args.count}件 追加完了")
-                        try:
-                            page.screenshot(path=f"logs/netsea_added_{added_count:02d}.png")
-                        except Exception:
-                            pass
+                        snap(page, f"added_{added_count:02d}")
                 except Exception as e:
                     logger.warning(f"  商品処理エラー: {e}")
                     close_modal(page)
@@ -421,11 +475,14 @@ def main():
             logger.info(f"\n{'='*50}")
             logger.info(f"完了: {added_count}/{args.count}件 追加しました")
             logger.info(f"{'='*50}")
-            logger.info("\nブラウザはそのまま開いています。")
-            try:
-                input("Enterキーで終了...")
-            except (EOFError, KeyboardInterrupt):
-                pass
+            if _AUTO:
+                logger.info("\nAUTOモード: ブラウザを閉じます。")
+            else:
+                logger.info("\nブラウザはそのまま開いています。")
+                try:
+                    input("Enterキーで終了...")
+                except (EOFError, KeyboardInterrupt):
+                    pass
             browser.close()
 
 

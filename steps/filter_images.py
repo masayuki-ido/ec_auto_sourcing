@@ -1,6 +1,7 @@
 """
 画像フィルタリング: 中国語テキスト検出・サイズチェック
 """
+from __future__ import annotations
 import logging
 import requests
 from config import MIN_IMAGE_SHORT_SIDE

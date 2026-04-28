@@ -6,6 +6,7 @@ ECサイト商品自動追加 メインスクリプト
     python main.py --keyword サコッシュ   # キーワード指定
     python main.py --dry-run        # 実際には追加せず確認のみ
 """
+from __future__ import annotations
 import argparse
 import json
 import logging
@@ -23,6 +24,20 @@ from steps.filter_images  import filter_by_image
 from steps.color_check    import sync_colors
 from steps.category_select import select_category
 from steps.add_product    import add_product
+
+# ─── スクショ保存ヘルパ ────────────────────────────────
+SHOT_DIR = config.LOGS_DIR / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+SHOT_DIR.mkdir(parents=True, exist_ok=True)
+_shot_counter = {"n": 0}
+
+def snap(page, label: str) -> None:
+    _shot_counter["n"] += 1
+    path = SHOT_DIR / f"{_shot_counter['n']:03d}_{label}.png"
+    try:
+        page.screenshot(path=str(path), full_page=True)
+        logging.getLogger(__name__).info(f"[SHOT] {path}")
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"スクショ失敗 {label}: {e}")
 
 # ─── ログ設定 ────────────────────────────────────────────
 def setup_logging() -> None:
@@ -81,6 +96,7 @@ def run(keywords: list[str] | None = None, dry_run: bool = False) -> int:
         try:
             # ── ログイン ──
             login(page)
+            snap(page, "after_login")
 
             for keyword in keywords:
                 if total_added >= config.ADD_LIMIT:
@@ -88,7 +104,9 @@ def run(keywords: list[str] | None = None, dry_run: bool = False) -> int:
 
                 # ── 検索 ──
                 navigate_to_search(page)
+                snap(page, f"search_page_{keyword}")
                 products = search_products(page, keyword)
+                snap(page, f"search_results_{keyword}")
                 if not products:
                     logger.warning(f"「{keyword}」の検索結果が 0 件でした")
                     continue
@@ -113,9 +131,11 @@ def run(keywords: list[str] | None = None, dry_run: bool = False) -> int:
                     try:
                         # ── カテゴリ選択 ──
                         product = select_category(page, product)
+                        snap(page, f"category_{total_added+1}")
 
                         # ── カラー整合性チェック ──
                         product = sync_colors(page, product)
+                        snap(page, f"color_{total_added+1}")
 
                         # ── 商品追加 ──
                         if dry_run:
@@ -123,6 +143,7 @@ def run(keywords: list[str] | None = None, dry_run: bool = False) -> int:
                             success = True
                         else:
                             success = add_product(page, product)
+                            snap(page, f"added_{total_added+1}")
 
                         if success:
                             total_added += 1
@@ -141,6 +162,10 @@ def run(keywords: list[str] | None = None, dry_run: bool = False) -> int:
 
         except RuntimeError as e:
             logger.critical(f"致命的エラーにより終了: {e}")
+            try:
+                snap(page, "fatal_error")
+            except Exception:
+                pass
         finally:
             browser.close()
 
