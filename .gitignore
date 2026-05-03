@@ -7,3 +7,4 @@ logs/
 added_products.json
 *.png
 *.jpg
+!data/instagram/covers/*.jpg

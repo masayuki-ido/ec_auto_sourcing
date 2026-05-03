@@ -1,6 +1,16 @@
 {
-  "image_url": "https://fulmo-img-server.com/sacoche-sacolla/3b58058f-418a-498f-8275-3dc474e31834.jpg",
-  "caption": "本日のおすすめアイテム ✨\n\nシンプルで使いやすい、毎日の相棒に。\n\n#サコッシュ #ショルダーバッグ #毎日コーデ #バッグ好き",
-  "media_type": "single",
-  "image_urls": []
+  "item_id": "110",
+  "caption": "毎日に、ちょうどいい軽さと余白を。\n\nお財布もスマホも迷わず入る、コンパクトなのに頼れる収納力。\n軽量ナイロンだから、長時間の外出でも肩への負担が少ない。\n調節可能なストラップで、斜め掛けのシルエットもスマートに決まる。\n\n──────────\n📐 サイズ: W22 × H14.5 × D約3cm / ストラップ140cm（調節可能）/ ストラップ幅2cm\n🎨 カラー: ブラック\n🧵 素材: ナイロン\n💴 価格: ¥5,480\n──────────\n\nプロフィールリンクから、商品ページをチェックしてみてください。\n\n#サコッシュ #サコッシュコーデ #サコッシュバッグ #サコッシュショルダー #シンプルコーデ #大人カジュアル #毎日コーデ #通勤コーデ #お出かけコーデ #ショルダーバッグ #斜めがけバッグ #コンパクトバッグ #軽量バッグ #ナイロンバッグ #ミニマリスト #ミニマルファッション #手ぶら派 #sacoche #minimalbag #ブラックバッグコーデ #ナイロンサコッシュ #ミニマリストバッグ",
+  "cover_top": "毎日をもっとシンプルに",
+  "cover_bottom": "ナイロン\nサコッシュ",
+  "media_type": "carousel",
+  "image_urls": [
+    "https://raw.githubusercontent.com/masayuki-ido/ec_auto_sourcing/main/data/instagram/covers/110.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/42e695e1096c40e28d2cd6f5528e8a5a.jepg",
+    "https://fulmo-img-server.com/sacoche-sacolla/02040cabc0e34a48aee26ca50389a072.jepg",
+    "https://fulmo-img-server.com/sacoche-sacolla/ed6d3bd2f1ec4988a0e516811db4fa67.jepg",
+    "https://fulmo-img-server.com/sacoche-sacolla/16d6023c0aaa450d8c920b660d27bba5.jepg",
+    "https://fulmo-img-server.com/sacoche-sacolla/243b23ffe6e5413fa5aeccc95d549d61.jepg"
+  ],
+  "image_url": ""
 }
