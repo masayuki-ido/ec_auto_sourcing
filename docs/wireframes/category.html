@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WF - カテゴリ一覧 | バッグ口コミサイト</title>
+<link rel="stylesheet" href="tailwind.css">
+<style>
+  body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; }
+  .ph { background: repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 10px, #e2e8f0 10px, #e2e8f0 20px); color:#64748b; display:flex; align-items:center; justify-content:center; font-size: 11px; }
+</style>
+</head>
+<body class="bg-white text-gray-800">
+
+<div class="max-w-7xl mx-auto">
+  <!-- ヘッダー -->
+  <header class="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-gray-300 bg-white sticky top-0 z-10">
+    <div class="flex items-center gap-4 md:gap-8">
+      <button class="md:hidden text-2xl">☰</button>
+      <a href="index.html" class="text-lg md:text-xl font-serif font-bold">BagReview<span class="text-rose-500">.</span></a>
+      <nav class="hidden md:flex gap-6 text-sm">
+        <a href="category.html" class="hover:underline">ブランド</a>
+        <a href="category.html" class="hover:underline font-bold">カテゴリ</a>
+        <a href="#" class="hover:underline">ランキング</a>
+      </nav>
+    </div>
+    <div class="flex items-center gap-3 md:gap-4">
+      <button class="md:hidden text-xl">🔍</button>
+      <input type="text" placeholder="🔍 検索" class="hidden md:block border rounded px-3 py-1.5 text-sm w-48 lg:w-64 bg-gray-50">
+      <a href="#" class="text-xs md:text-sm border border-rose-500 text-rose-500 px-2 md:px-3 py-1 md:py-1.5 rounded">ログイン</a>
+    </div>
+  </header>
+
+  <!-- パンくず -->
+  <div class="px-4 md:px-6 py-2 md:py-3 text-[10px] md:text-xs text-gray-500">
+    <a href="index.html">ホーム</a> &gt; カテゴリ &gt; <span class="text-gray-800">トートバッグ</span>
+  </div>
+
+  <!-- タイトル -->
+  <div class="px-4 md:px-6 pb-3 md:pb-4">
+    <h1 class="text-xl md:text-2xl font-bold">トートバッグ <span class="text-xs md:text-sm text-gray-500 font-normal">1,234件</span></h1>
+    <p class="text-xs md:text-sm text-gray-600 mt-1">収納力重視の定番。通勤・通学・お出かけまで。</p>
+  </div>
+
+  <!-- モバイル用：絞り込み・並べ替えバー -->
+  <div class="md:hidden px-4 pb-3 flex gap-2">
+    <button class="flex-1 border bg-white rounded px-3 py-2 text-xs">⚙️ 絞り込み</button>
+    <button class="flex-1 border bg-white rounded px-3 py-2 text-xs">⇅ 評価が高い順</button>
+  </div>
+
+  <div class="flex gap-6 px-4 md:px-6 pb-10">
+    <!-- サイドバー：絞り込み（PC のみ） -->
+    <aside class="hidden md:block w-60 bg-white border rounded-lg p-4 h-fit sticky top-20">
+      <h3 class="font-bold mb-3 text-sm">絞り込み</h3>
+
+      <div class="mb-4">
+        <div class="text-xs font-bold text-gray-700 mb-2">ブランド</div>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> COACH (142)</label>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> 土屋鞄 (89)</label>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> Kate Spade (67)</label>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> PORTER (54)</label>
+        <a href="#" class="text-xs text-rose-500">もっと見る</a>
+      </div>
+
+      <div class="mb-4">
+        <div class="text-xs font-bold text-gray-700 mb-2">入るもの</div>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> A4 書類</label>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> 13インチPC</label>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> 15インチPC</label>
+      </div>
+
+      <div class="mb-4">
+        <div class="text-xs font-bold text-gray-700 mb-2">特徴</div>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> 軽い (1kg以下)</label>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> 自立する</label>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="checkbox"> 防水</label>
+      </div>
+
+      <div class="mb-4">
+        <div class="text-xs font-bold text-gray-700 mb-2">価格帯</div>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="radio" name="price"> 〜2万円</label>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="radio" name="price"> 2〜5万円</label>
+        <label class="flex items-center gap-2 text-sm mb-1"><input type="radio" name="price"> 5〜10万円</label>
+      </div>
+
+      <button class="w-full bg-rose-500 text-white py-2 rounded text-sm">絞り込む</button>
+    </aside>
+
+    <!-- メイン：商品グリッド -->
+    <main class="flex-1 min-w-0">
+      <!-- 並べ替え：PCのみ -->
+      <div class="hidden md:flex items-center justify-between mb-4 text-sm">
+        <div>評価順・人気順</div>
+        <select class="border rounded px-3 py-1.5 bg-white">
+          <option>評価が高い順</option>
+          <option>レビューが多い順</option>
+          <option>新着順</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        <a href="product.html" class="bg-white border rounded-lg p-2 md:p-3 hover:shadow block">
+          <div class="ph h-36 md:h-44 rounded mb-2">[商品画像]</div>
+          <div class="text-[10px] md:text-xs text-gray-500">COACH</div>
+          <div class="text-xs md:text-sm font-bold line-clamp-2">ウィロウ トート 24</div>
+          <div class="flex items-center gap-1 md:gap-2 text-[10px] md:text-xs mt-1">
+            <span>★4.6</span>
+            <span class="text-gray-500">(82)</span>
+          </div>
+          <div class="text-[11px] md:text-xs text-gray-700 mt-1">¥52,800〜</div>
+          <div class="mt-2 flex flex-wrap gap-1">
+            <span class="text-[9px] md:text-[10px] bg-gray-100 px-1.5 py-0.5 rounded">A4</span>
+            <span class="text-[9px] md:text-[10px] bg-gray-100 px-1.5 py-0.5 rounded">軽い</span>
+          </div>
+        </a>
+        <div class="bg-white border rounded-lg p-2 md:p-3">
+          <div class="ph h-36 md:h-44 rounded mb-2">[商品画像]</div>
+          <div class="text-[10px] md:text-xs text-gray-500">土屋鞄</div>
+          <div class="text-xs md:text-sm font-bold line-clamp-2">トーンオイルヌメ トート</div>
+          <div class="flex items-center gap-1 md:gap-2 text-[10px] md:text-xs mt-1"><span>★4.5</span><span class="text-gray-500">(61)</span></div>
+          <div class="text-[11px] md:text-xs text-gray-700 mt-1">¥68,000〜</div>
+        </div>
+        <div class="bg-white border rounded-lg p-2 md:p-3">
+          <div class="ph h-36 md:h-44 rounded mb-2">[商品画像]</div>
+          <div class="text-[10px] md:text-xs text-gray-500">Kate Spade</div>
+          <div class="text-xs md:text-sm font-bold line-clamp-2">ノット ミディアム トート</div>
+          <div class="flex items-center gap-1 md:gap-2 text-[10px] md:text-xs mt-1"><span>★4.3</span><span class="text-gray-500">(47)</span></div>
+          <div class="text-[11px] md:text-xs text-gray-700 mt-1">¥42,900〜</div>
+        </div>
+        <div class="bg-white border rounded-lg p-2 md:p-3">
+          <div class="ph h-36 md:h-44 rounded mb-2">[商品画像]</div>
+          <div class="text-[10px] md:text-xs text-gray-500">PORTER</div>
+          <div class="text-xs md:text-sm font-bold line-clamp-2">タンカー トートバッグ (L)</div>
+          <div class="flex items-center gap-1 md:gap-2 text-[10px] md:text-xs mt-1"><span>★4.4</span><span class="text-gray-500">(38)</span></div>
+          <div class="text-[11px] md:text-xs text-gray-700 mt-1">¥24,200〜</div>
+        </div>
+        <div class="bg-white border rounded-lg p-2 md:p-3">
+          <div class="ph h-36 md:h-44 rounded mb-2">[商品画像]</div>
+          <div class="text-[10px] md:text-xs text-gray-500">COACH</div>
+          <div class="text-xs md:text-sm font-bold line-clamp-2">ハドソン 29</div>
+          <div class="flex items-center gap-1 md:gap-2 text-[10px] md:text-xs mt-1"><span>★4.2</span><span class="text-gray-500">(29)</span></div>
+          <div class="text-[11px] md:text-xs text-gray-700 mt-1">¥48,400〜</div>
+        </div>
+        <div class="bg-white border rounded-lg p-2 md:p-3">
+          <div class="ph h-36 md:h-44 rounded mb-2">[商品画像]</div>
+          <div class="text-[10px] md:text-xs text-gray-500">ANYA HINDMARCH</div>
+          <div class="text-xs md:text-sm font-bold line-clamp-2">I AM A Plastic Bag</div>
+          <div class="flex items-center gap-1 md:gap-2 text-[10px] md:text-xs mt-1"><span>★4.1</span><span class="text-gray-500">(22)</span></div>
+          <div class="text-[11px] md:text-xs text-gray-700 mt-1">¥22,000〜</div>
+        </div>
+      </div>
+
+      <div class="flex justify-center gap-1 md:gap-2 mt-6 md:mt-8 text-xs md:text-sm">
+        <button class="px-2 md:px-3 py-1 border rounded bg-white">&lt;</button>
+        <button class="px-2 md:px-3 py-1 border rounded bg-rose-500 text-white">1</button>
+        <button class="px-2 md:px-3 py-1 border rounded bg-white">2</button>
+        <button class="px-2 md:px-3 py-1 border rounded bg-white">3</button>
+        <button class="px-2 md:px-3 py-1 border rounded bg-white">...</button>
+        <button class="px-2 md:px-3 py-1 border rounded bg-white">&gt;</button>
+      </div>
+    </main>
+  </div>
+
+  <footer class="px-4 md:px-6 py-6 md:py-8 text-xs text-gray-500 border-t text-center md:text-left">
+    BagReview © 2026
+  </footer>
+
+  <!-- モバイル専用ボトムナビ -->
+  <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white border-t flex justify-around py-2 text-xs">
+    <a href="index.html" class="flex flex-col items-center text-gray-500"><div>🏠</div>ホーム</a>
+    <a href="category.html" class="flex flex-col items-center text-rose-500"><div>🔍</div>探す</a>
+    <a href="#" class="flex flex-col items-center text-gray-500"><div>♡</div>クリップ</a>
+    <a href="#" class="flex flex-col items-center text-gray-500"><div>👤</div>マイページ</a>
+  </nav>
+  <div class="md:hidden h-16"></div>
+</div>
+
+</body>
+</html>
