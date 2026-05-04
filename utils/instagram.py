@@ -117,7 +117,7 @@ def publish_carousel(image_urls: list[str], caption: str) -> str:
 
     # 各画像を子コンテナとして作成
     children_ids = []
-    for url in image_urls:
+    for idx, url in enumerate(image_urls):
         res = requests.post(
             f"{GRAPH_BASE}/{user_id}/media",
             data={
@@ -127,7 +127,9 @@ def publish_carousel(image_urls: list[str], caption: str) -> str:
             },
             timeout=60,
         )
-        res.raise_for_status()
+        if not res.ok:
+            logger.error(f"子コンテナ作成失敗 idx={idx} url={url} status={res.status_code} body={res.text}")
+            res.raise_for_status()
         children_ids.append(res.json()["id"])
 
     for cid in children_ids:
