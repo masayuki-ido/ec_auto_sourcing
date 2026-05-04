@@ -129,7 +129,10 @@ CAPTION_SYSTEM = """あなたはサコッシュ・ショルダーバッグ専門
    💴 価格: ¥<価格を3桁カンマ区切り>
    ──────────
 6. 空行
-7. CTA (1行) — 「プロフィールリンクから」「他カラーもチェック」など軽い誘導
+7. CTA (1〜2行) — 必ず @sacochesacolla を含めて誘導する。
+   例: 「詳細は @sacochesacolla のプロフィールリンクから」
+       「他カラーや新作は @sacochesacolla をチェック」
+   @sacochesacolla はIG上でタップするとプロフィールに飛べるので必須。
 
 厳守事項:
 - 素材名・色名・カテゴリ名は商品情報の表記を1文字も変えずに使うこと(「ナイロン」を「ナイロム」など絶対NG)
@@ -137,6 +140,7 @@ CAPTION_SYSTEM = """あなたはサコッシュ・ショルダーバッグ専門
 - サイズが「記載なし」の場合は「📐 サイズ: お問い合わせください」と書く
 - カラーが1色しかない商品で「全N色」と書かない
 - 商品説明に書かれていない機能・素材・特徴を勝手に追加しない
+- CTAには必ず @sacochesacolla を1回入れる(タップ可能な誘導リンクとして機能する)
 
 出力は JSON 1個のみ。マークダウンや前置き禁止。"""
 
@@ -159,8 +163,9 @@ CAPTION_USER_TEMPLATE = """以下の商品からキャプションを作成し�
 {{
   "body": "<本文。改行は \\n。フック/空行/ベネフィット3行/空行/スペックブロック/空行/CTA の構成>",
   "hashtags": ["#xxx", "#yyy", ...],
-  "cover_top": "<表紙画像の上部に入る短い煽り(8〜14文字目安)。例: 大切な人へのプレゼントに / 通勤がもっと身軽に / 週末コーデの相棒に >",
-  "cover_bottom": "<表紙画像の下部に入る大字。改行 \\n で2行構成 (例: 本革\\nサコッシュ / 帆布\\nショルダー)。素材+カテゴリの組み合わせを基本とする>"
+  "cover_top": "<表紙上部の【】内に入る短いコピー(7〜12文字目安)。例: 毎日に軽さを / 大人のコーデに / 通勤がラクに>",
+  "cover_left": "<表紙左側の縦書き(3〜5文字)。素材+小カテゴリ系。例: ナイロン / 本革 / 帆布>",
+  "cover_right": "<表紙右側の縦書き(4〜6文字)。商品の決め台詞・コンセプト系。例: サコッシュ / 大人の相棒 / 軽さが正義>"
 }}
 
 hashtagsの選び方(重要):
@@ -172,10 +177,11 @@ hashtagsの選び方(重要):
 - 英語タグは2〜3個まで
 - 以下のベースタグは出力に含めないでください(後段で自動付与): {base_tags}
 
-cover_top / cover_bottom の制約:
-- cover_top は ＼／ で囲まれて表示されるので、それ自体には ＼／ を含めない
-- cover_bottom は 1行 4〜6文字 × 2行を目安に。長すぎると画像からはみ出す
-- どちらも商品情報に裏付けのある内容のみ。素材・カテゴリは原文表記そのまま
+cover_* の制約:
+- cover_top は 【】で囲まれて表示されるので、それ自体には 【】 を含めない
+- cover_left / cover_right はそれぞれ縦書きで表示されるので、文字数厳守(長いと画像からはみ出す)
+- 全て商品情報に裏付けのある内容のみ。素材・カテゴリは原文表記そのまま
+- cover_left / right は左右で意味が被らないように(例: 左=素材、右=コンセプトor用途)
 """
 
 
@@ -215,11 +221,18 @@ def collect_images(row: dict, max_n: int = MAX_CAROUSEL_IMAGES) -> list[str]:
     return urls
 
 
+def has_real_size(row: dict) -> bool:
+    sd = (row.get("size_description") or "").strip()
+    return bool(sd) and sd != "記載なし"
+
+
 def score(row: dict) -> float:
-    """is_popular=true を最優先、次に display(小さいほど高優先)"""
+    """is_popular > サイズ記載あり > display(小さいほど高優先)"""
     s = 0.0
     if row.get("is_popular") == "true":
         s += 100.0
+    if has_real_size(row):
+        s += 50.0  # サイズが入ってる商品を優遇
     try:
         display = int(row.get("display", "9999"))
     except ValueError:
@@ -228,7 +241,12 @@ def score(row: dict) -> float:
     return s
 
 
-def pick_product(rows: list[dict], posted: set[str], item_id: str | None) -> dict:
+def pick_product(
+    rows: list[dict],
+    posted: set[str],
+    item_id: str | None,
+    color_filter: str | None = None,
+) -> dict:
     if item_id:
         for r in rows:
             if r["item_id"] == str(item_id):
@@ -241,8 +259,13 @@ def pick_product(rows: list[dict], posted: set[str], item_id: str | None) -> dic
         and r.get("hide") == "false"
         and len(collect_images(r)) >= MIN_IMAGES_REQUIRED
     ]
+    if color_filter:
+        candidates = [r for r in candidates if color_filter in (r.get("color") or "")]
     if not candidates:
-        raise RuntimeError("投稿候補がありません(全件投稿済み or 画像不足)")
+        raise RuntimeError(
+            "投稿候補がありません"
+            f"{' (color=' + color_filter + ')' if color_filter else ''}"
+        )
 
     candidates.sort(key=score, reverse=True)
     top = candidates[: min(10, len(candidates))]
@@ -313,11 +336,20 @@ def build_post(product: dict, skip_cover: bool = False) -> dict:
     cover_url: str = ""
     if not skip_cover and product_images:
         try:
+            # 表紙ソースは4枚目を優先(商品単体の studio shot が多い)。なければ後ろから探す
+            if len(product_images) >= 4:
+                cover_src_url = product_images[3]
+            else:
+                cover_src_url = product_images[-1]
             cover_local = make_cover(
-                image_url=product_images[0],
+                image_url=cover_src_url,
                 top_text=gen.get("cover_top", "今日のおすすめ"),
-                bottom_text=gen.get("cover_bottom", product["name"][:8]),
+                bottom_text=gen.get("cover_bottom", ""),
                 out_path=COVERS_DIR / f"{product['item_id']}.jpg",
+                item_id=product["item_id"],
+                price="",  # 値段は表紙に載せない
+                cover_left="サコッシュ",  # ブランド統一で固定
+                cover_right=gen.get("cover_right", ""),
             )
             cover_url = f"{GITHUB_RAW_BASE}/data/instagram/covers/{product['item_id']}.jpg"
             logger.info(f"表紙生成: {cover_local}")
@@ -332,7 +364,8 @@ def build_post(product: dict, skip_cover: bool = False) -> dict:
         "item_id": product["item_id"],
         "caption": caption,
         "cover_top": gen.get("cover_top", ""),
-        "cover_bottom": gen.get("cover_bottom", ""),
+        "cover_left": gen.get("cover_left", ""),
+        "cover_right": gen.get("cover_right", ""),
     }
     if len(images) >= 2:
         base.update({
@@ -409,13 +442,14 @@ def main() -> None:
     parser.add_argument("--no-record", action="store_true", help="posted_items.json に追加しない")
     parser.add_argument("--preview", action="store_true", help="生成内容をブラウザで開く")
     parser.add_argument("--no-open", action="store_true", help="--preview 時にブラウザを開かない (HTMLだけ書き出し)")
+    parser.add_argument("--color", help="指定色を含む商品に絞る (例: --color ブラック)")
     args = parser.parse_args()
 
     rows = load_csv()
     posted = load_posted_items()
     logger.info(f"CSV: {len(rows)}件 / 投稿済み: {len(posted)}件")
 
-    product = pick_product(rows, posted, args.item_id)
+    product = pick_product(rows, posted, args.item_id, color_filter=args.color)
     logger.info(
         f"選定: [{product['item_id']}] {product['name']} ¥{product['price']} "
         f"(popular={product.get('is_popular')}, display={product.get('display')})"
