@@ -221,6 +221,42 @@ def collect_images(row: dict, max_n: int = MAX_CAROUSEL_IMAGES) -> list[str]:
     return urls
 
 
+# Instagram カルーセル投稿のアスペクト比制約 (公式: 0.8〜1.91)
+IG_ASPECT_MIN = 0.8
+IG_ASPECT_MAX = 1.91
+
+
+def _is_ig_compatible(image_url: str) -> bool:
+    """画像URLをHEAD的にダウンロードしてアスペクト比をチェック"""
+    try:
+        from io import BytesIO
+        from PIL import Image
+        import requests as _req
+        res = _req.get(image_url, timeout=15)
+        if not res.ok:
+            return False
+        img = Image.open(BytesIO(res.content))
+        w, h = img.size
+        if h == 0:
+            return False
+        ratio = w / h
+        return IG_ASPECT_MIN <= ratio <= IG_ASPECT_MAX
+    except Exception as e:
+        logger.warning(f"アスペクト比チェック失敗 {image_url}: {e}")
+        return False
+
+
+def filter_ig_compatible(urls: list[str]) -> list[str]:
+    """カルーセル投稿規格に合う画像URLだけ残す"""
+    kept = []
+    for u in urls:
+        if _is_ig_compatible(u):
+            kept.append(u)
+        else:
+            logger.warning(f"アスペクト比NGで除外: {u}")
+    return kept
+
+
 def has_real_size(row: dict) -> bool:
     sd = (row.get("size_description") or "").strip()
     return bool(sd) and sd != "記載なし"
@@ -327,6 +363,8 @@ def merge_hashtags(generated: list[str]) -> list[str]:
 
 def build_post(product: dict, skip_cover: bool = False) -> dict:
     product_images = collect_images(product)
+    # Instagram規格外(アスペクト比0.8〜1.91外)を除外
+    product_images = filter_ig_compatible(product_images)
     gen = generate_caption(product)
     body = gen["body"].strip()
     tags = merge_hashtags(gen.get("hashtags", []))
