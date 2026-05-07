@@ -1,8 +1,11 @@
 name: Instagram Daily Post
 
 on:
-  # 自動実行は停止中(2026-05-07〜)。投稿は workflow_dispatch で手動トリガー。
+  # 自動実行は停止中。投稿は workflow_dispatch で手動トリガー。
   # 再開する場合は schedule: 配下の cron を有効化する。
+  schedule:
+    # 2026-05-07 17:00 JST = 08:00 UTC の item 105 用 (一時。投稿後に削除すること)
+    - cron: "0 8 7 5 *"
   workflow_dispatch:
 
 permissions:

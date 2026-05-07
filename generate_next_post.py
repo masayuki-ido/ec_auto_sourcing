@@ -40,8 +40,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).parent
-DEFAULT_CSV = Path.home() / "Downloads" / "item_sacoche-sacolla.csv"
-CSV_PATH = Path(os.getenv("ITEM_CSV", str(DEFAULT_CSV)))
+# 優先順: 環境変数 > リポジトリ内のpublic CSV > ローカルDownloads
+_PUBLIC_CSV = ROOT / "data" / "items_public.csv"
+_LOCAL_CSV = Path.home() / "Downloads" / "item_sacoche-sacolla.csv"
+if os.getenv("ITEM_CSV"):
+    CSV_PATH = Path(os.getenv("ITEM_CSV"))
+elif _PUBLIC_CSV.exists():
+    CSV_PATH = _PUBLIC_CSV
+else:
+    CSV_PATH = _LOCAL_CSV
 NEXT_POST_PATH = ROOT / "data" / "instagram" / "next_post.json"
 POSTED_ITEMS_PATH = ROOT / "data" / "instagram" / "posted_items.json"
 COVERS_DIR = ROOT / "data" / "instagram" / "covers"

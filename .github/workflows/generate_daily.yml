@@ -1,0 +1,74 @@
+name: Generate Daily Post Candidate
+
+on:
+  schedule:
+    # 毎日 09:00 JST = 00:00 UTC
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install anthropic python-dotenv requests Pillow numpy "rembg[cpu]"
+
+      - name: Generate next post
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python generate_next_post.py
+
+      - name: Commit changes
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/instagram/ || true
+          if ! git diff --cached --quiet; then
+            ITEM_ID=$(python -c "import json; print(json.load(open('data/instagram/next_post.json'))['item_id'])")
+            git commit -m "auto: $(date -u +%Y-%m-%d) 投稿候補(item $ITEM_ID)"
+            git push
+            echo "item_id=$ITEM_ID" >> "$GITHUB_OUTPUT"
+            echo "committed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "committed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create review issue
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ITEM_ID: ${{ steps.commit.outputs.item_id }}
+        run: |
+          DATE_JST=$(TZ=Asia/Tokyo date +%Y-%m-%d)
+          PREVIEW_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/data/instagram/covers/${ITEM_ID}.jpg"
+          NEXT_JSON_URL="https://github.com/${{ github.repository }}/blob/main/data/instagram/next_post.json"
+          POST_RUN_URL="https://github.com/${{ github.repository }}/actions/workflows/instagram_daily_post.yml"
+          REGEN_URL="https://github.com/${{ github.repository }}/actions/workflows/generate_daily.yml"
+
+          CAPTION=$(python -c "import json; print(json.load(open('data/instagram/next_post.json'))['caption'])")
+
+          gh issue create \
+            --title "📸 ${DATE_JST} の投稿候補 (item ${ITEM_ID})" \
+            --body "$(printf '## 表紙\n![cover](%s)\n\n## キャプション\n```\n%s\n```\n\n## 投稿する\n👉 [Actions の Instagram Daily Post を Run workflow](%s)\n\n## 候補を作り直す\n👉 [Actions の Generate Daily Post Candidate を Re-run](%s)\n\n## 詳細\n- [next_post.json](%s)\n- 自動生成: %s\n' \
+              "$PREVIEW_URL" \
+              "$CAPTION" \
+              "$POST_RUN_URL" \
+              "$REGEN_URL" \
+              "$NEXT_JSON_URL" \
+              "$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')")"
