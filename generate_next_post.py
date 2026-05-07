@@ -115,11 +115,13 @@ CAPTION_SYSTEM = """あなたはサコッシュ・ショルダーバッグ専門
 新着・人気商品を紹介する投稿のキャプションを作成してください。
 
 トーン: 親しみやすく上品。装飾的すぎない。読者の生活シーンが想像できる文章。
+**毎回違うフック・違う切り口**で書く。「毎日に〜」「身軽に〜」のような同じ言い回しを連発しない。
+切り口の例: 質問投げかけ / 場面描写 / ユーザーの心の声 / 数値訴求(価格・サイズ) / 比較訴求(普通のバッグとの違い) / コンセプト訴求
 
 本文の構成 (JSON の "body" に入れる):
-1. フック (1行) — 商品の魅力を凝縮した一行コピー。絵文字は0〜2個まで
+1. フック (1行) — 商品の魅力を凝縮した一行コピー。絵文字は0〜2個まで。前回投稿と被らせない
 2. 空行
-3. ベネフィット (3行) — 特徴ではなく「ユーザーの生活でどう嬉しいか」を3行で
+3. ベネフィット (3行) — 特徴ではなく「ユーザーの生活でどう嬉しいか」を3行で。視点を1行ずつ変える(機能/コーデ/シーン)
 4. 空行
 5. スペックブロック — 以下の形式で商品情報を箇条書き
    ──────────
@@ -139,6 +141,7 @@ CAPTION_SYSTEM = """あなたはサコッシュ・ショルダーバッグ専門
 - サイズは商品情報に記載された数値のみ使う。書いてない数値を捏造しない
 - サイズが「記載なし」の場合は「📐 サイズ: お問い合わせください」と書く
 - カラーが1色しかない商品で「全N色」と書かない
+- **カラーが3色以上ある商品は、本文中(ベネフィット or CTA付近)で「カラー豊富」「全N色展開」「N色から選べる」など色数の訴求を必ず入れる**
 - 商品説明に書かれていない機能・素材・特徴を勝手に追加しない
 - CTAには必ず @sacochesacolla を1回入れる(タップ可能な誘導リンクとして機能する)
 
@@ -163,9 +166,9 @@ CAPTION_USER_TEMPLATE = """以下の商品からキャプションを作成し�
 {{
   "body": "<本文。改行は \\n。フック/空行/ベネフィット3行/空行/スペックブロック/空行/CTA の構成>",
   "hashtags": ["#xxx", "#yyy", ...],
-  "cover_top": "<表紙上部の【】内に入る短いコピー(7〜12文字目安)。例: 毎日に軽さを / 大人のコーデに / 通勤がラクに>",
-  "cover_left": "<表紙左側の縦書き(3〜5文字)。素材+小カテゴリ系。例: ナイロン / 本革 / 帆布>",
-  "cover_right": "<表紙右側の縦書き(4〜6文字)。商品の決め台詞・コンセプト系。例: サコッシュ / 大人の相棒 / 軽さが正義>"
+  "cover_top": "<表紙上部の【】内に入る訴求文(8〜15文字目安)。商品の最大の強みを言い切る。例: コンパクトなのに収納抜群 / 通勤バッグの新定番 / 軽さは正義 / 旅にも普段にも / プチプラで大人見え>",
+  "cover_left": "<表紙左側の縦書き(4〜7文字)。商品の特徴・形容を表す短文。例: 軽いコンパクト / 上質レザー / 撥水ナイロン / シンプル美人>",
+  "cover_right": "<表紙右側の縦書き(4〜6文字)。商品カテゴリ系で固定気味。例: サコッシュ / ショルダー / クロスバッグ>"
 }}
 
 hashtagsの選び方(重要):
@@ -178,10 +181,10 @@ hashtagsの選び方(重要):
 - 以下のベースタグは出力に含めないでください(後段で自動付与): {base_tags}
 
 cover_* の制約:
-- cover_top は 【】で囲まれて表示されるので、それ自体には 【】 を含めない
-- cover_left / cover_right はそれぞれ縦書きで表示されるので、文字数厳守(長いと画像からはみ出す)
+- cover_top は 【】で囲まれて表示されるので、それ自体には 【】 を含めない。**毎回違う訴求**にする
+- cover_left / cover_right はそれぞれ縦書きで表示される。文字数厳守(長いと画像からはみ出す)
+- cover_left = 商品の「特徴・形容」(例: 軽いコンパクト、上質レザー、撥水ナイロン)、cover_right = 商品の「カテゴリ」(例: サコッシュ、ショルダー)
 - 全て商品情報に裏付けのある内容のみ。素材・カテゴリは原文表記そのまま
-- cover_left / right は左右で意味が被らないように(例: 左=素材、右=コンセプトor用途)
 """
 
 
@@ -361,33 +364,63 @@ def merge_hashtags(generated: list[str]) -> list[str]:
     return merged
 
 
-def build_post(product: dict, skip_cover: bool = False) -> dict:
+def _fix_material_in_body(body: str, expected_material: str) -> str:
+    """🧵 素材: 行に書かれた素材が expected と異なれば修正。基本ガード"""
+    import re as _re
+    if not expected_material or expected_material == "バッグ":
+        return body
+    pattern = r"(🧵\s*素材[::]\s*)([^\n]+)"
+    m = _re.search(pattern, body)
+    if not m:
+        return body
+    written = m.group(2).strip()
+    if expected_material not in written:
+        logger.warning(f"素材表記の不一致を修正: 「{written}」→「{expected_material}」")
+        body = _re.sub(pattern, lambda mm: f"{mm.group(1)}{expected_material}", body, count=1)
+    return body
+
+
+def build_post(
+    product: dict,
+    skip_cover: bool = False,
+    cover_image_override: str | None = None,
+    cover_top_override: str | None = None,
+    cover_left_override: str | None = None,
+    cover_right_override: str | None = None,
+    bg_index: int | None = None,
+) -> dict:
     product_images = collect_images(product)
     # Instagram規格外(アスペクト比0.8〜1.91外)を除外
     product_images = filter_ig_compatible(product_images)
     gen = generate_caption(product)
     body = gen["body"].strip()
+    # 素材表記のセーフティネット(Claudeが誤った場合に category 由来の正値で上書き)
+    cat_id = (product.get("category_id") or "").split(",")[0]
+    expected_material = CATEGORY_LABEL.get(cat_id, "バッグ")
+    body = _fix_material_in_body(body, expected_material)
     tags = merge_hashtags(gen.get("hashtags", []))
     caption = f"{body}\n\n{' '.join(tags)}"
 
     cover_local: Path | None = None
     cover_url: str = ""
-    if not skip_cover and product_images:
+    if not skip_cover and (product_images or cover_image_override):
         try:
-            # 表紙ソースは4枚目を優先(商品単体の studio shot が多い)。なければ後ろから探す
-            if len(product_images) >= 4:
+            if cover_image_override:
+                cover_src_url = cover_image_override
+            elif len(product_images) >= 4:
                 cover_src_url = product_images[3]
             else:
                 cover_src_url = product_images[-1]
             cover_local = make_cover(
                 image_url=cover_src_url,
-                top_text=gen.get("cover_top", "今日のおすすめ"),
+                top_text=cover_top_override or gen.get("cover_top", "今日のおすすめ"),
                 bottom_text=gen.get("cover_bottom", ""),
                 out_path=COVERS_DIR / f"{product['item_id']}.jpg",
                 item_id=product["item_id"],
-                price="",  # 値段は表紙に載せない
-                cover_left="サコッシュ",  # ブランド統一で固定
-                cover_right=gen.get("cover_right", ""),
+                price="",
+                cover_left=cover_left_override or gen.get("cover_left", "サコッシュ"),
+                cover_right=cover_right_override or gen.get("cover_right", "サコッシュ"),
+                bg_index=bg_index,
             )
             cover_url = f"{GITHUB_RAW_BASE}/data/instagram/covers/{product['item_id']}.jpg"
             logger.info(f"表紙生成: {cover_local}")
@@ -481,6 +514,11 @@ def main() -> None:
     parser.add_argument("--preview", action="store_true", help="生成内容をブラウザで開く")
     parser.add_argument("--no-open", action="store_true", help="--preview 時にブラウザを開かない (HTMLだけ書き出し)")
     parser.add_argument("--color", help="指定色を含む商品に絞る (例: --color ブラック)")
+    parser.add_argument("--cover-image", help="表紙ソース画像を上書き (URLまたはローカルパス)")
+    parser.add_argument("--cover-left", help="表紙の左縦書きを上書き")
+    parser.add_argument("--cover-right", help="表紙の右縦書きを上書き")
+    parser.add_argument("--cover-top", help="表紙の【】タイトルを上書き")
+    parser.add_argument("--bg-index", type=int, help="表紙背景色をパレット番号で指定 (0=mint, 1=pink, 2=mustard, 3=gray, 4=beige, 5=sage, 6=lavender, 7=peach)")
     args = parser.parse_args()
 
     rows = load_csv()
@@ -493,7 +531,14 @@ def main() -> None:
         f"(popular={product.get('is_popular')}, display={product.get('display')})"
     )
 
-    post = build_post(product)
+    post = build_post(
+        product,
+        cover_image_override=args.cover_image,
+        cover_top_override=args.cover_top,
+        cover_left_override=args.cover_left,
+        cover_right_override=args.cover_right,
+        bg_index=args.bg_index,
+    )
     n_images = len(post.get("image_urls") or []) or (1 if post.get("image_url") else 0)
     logger.info(f"画像枚数: {n_images} / media_type={post['media_type']}")
     logger.info(f"\n----- caption -----\n{post['caption']}\n-------------------")

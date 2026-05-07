@@ -60,10 +60,14 @@ def _square_crop(img: Image.Image) -> Image.Image:
     return img.crop(((w - s) // 2, (h - s) // 2, (w + s) // 2, (h + s) // 2))
 
 
-def _download(url: str) -> Image.Image:
-    res = requests.get(url, timeout=30)
-    res.raise_for_status()
-    return Image.open(BytesIO(res.content)).convert("RGB")
+def _download(url_or_path: str) -> Image.Image:
+    """URLまたはローカルファイルパスから画像を読み込む"""
+    if url_or_path.startswith(("http://", "https://")):
+        res = requests.get(url_or_path, timeout=30)
+        res.raise_for_status()
+        return Image.open(BytesIO(res.content)).convert("RGB")
+    p = Path(url_or_path).expanduser().resolve()
+    return Image.open(p).convert("RGB")
 
 
 def _pick_bg(seed: str) -> tuple[int, int, int]:
@@ -107,14 +111,18 @@ def make_cover(
     price: str = "",
     cover_left: str = "",
     cover_right: str = "",
+    bg_index: int | None = None,
 ) -> Path:
     """マガジン風カバー画像を生成。
 
-    後方互換のため bottom_text は旧フィールドだが、
-    cover_left/cover_right が指定されない場合は bottom_text を縦書き2分割で使う。
+    bg_index: 0..len(BG_PALETTE)-1 で背景色を直接指定。
+              None なら item_id ハッシュで自動選定。
     """
-    # 背景色決定 (item_id ハッシュ)
-    bg_color = _pick_bg(item_id)
+    # 背景色決定
+    if bg_index is not None:
+        bg_color = BG_PALETTE[bg_index % len(BG_PALETTE)]
+    else:
+        bg_color = _pick_bg(item_id)
 
     # 商品画像ダウンロード → 背景除去(元のアスペクト比のまま)
     src = _download(image_url)
@@ -194,11 +202,12 @@ def make_cover(
         cover_left = parts[0] if parts else ""
         cover_right = parts[1] if len(parts) > 1 else ""
 
-    vert_font = _font(110)
+    vert_font = _font(96)
+    # 左右の縦書きを中央寄りに(端から160pxの位置)
     if cover_left:
-        _draw_vertical(draw, x=80, text=cover_left, font=vert_font, canvas_h=CANVAS)
+        _draw_vertical(draw, x=160, text=cover_left, font=vert_font, canvas_h=CANVAS)
     if cover_right:
-        _draw_vertical(draw, x=CANVAS - 80, text=cover_right, font=vert_font, canvas_h=CANVAS)
+        _draw_vertical(draw, x=CANVAS - 160, text=cover_right, font=vert_font, canvas_h=CANVAS)
 
     # ─── 下部 価格バッジ ────────────
     if price:
