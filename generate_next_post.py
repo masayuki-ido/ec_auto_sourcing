@@ -63,6 +63,8 @@ GITHUB_RAW_BASE = os.getenv(
 MODEL = "claude-sonnet-4-6"
 MAX_CAROUSEL_IMAGES = 5
 MIN_IMAGES_REQUIRED = 3
+# Metaのスパム/自動化検知を避けるためハッシュタグは15個までに制限
+MAX_HASHTAGS = 15
 
 # 必ず全投稿に付与するベースハッシュタグ(順序維持で先頭側に並ぶ)
 BASE_HASHTAGS = [
@@ -338,7 +340,7 @@ def generate_caption(product: dict) -> dict:
 
 
 def merge_hashtags(generated: list[str]) -> list[str]:
-    """BASE_HASHTAGS を先頭に、生成タグを後ろに。重複除去。"""
+    """BASE_HASHTAGS を先頭に、生成タグを後ろに。重複除去 + MAX_HASHTAGS で打ち切り。"""
     seen: set[str] = set()
     merged: list[str] = []
     for tag in BASE_HASHTAGS + generated:
@@ -350,6 +352,9 @@ def merge_hashtags(generated: list[str]) -> list[str]:
         if t not in seen:
             seen.add(t)
             merged.append(t)
+    if len(merged) > MAX_HASHTAGS:
+        logger.info(f"ハッシュタグ {len(merged)}個 → {MAX_HASHTAGS}個に切り詰め")
+        merged = merged[:MAX_HASHTAGS]
     return merged
 
 

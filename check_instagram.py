@@ -3,7 +3,10 @@ Instagram トークン動作確認スクリプト
 
 使い方:
     python check_instagram.py            # トークンが有効か確認
-    python check_instagram.py --refresh  # 長期トークンをリフレッシュ（60日延長）
+
+トークンは graph.instagram.com 系の長期ユーザートークン(60日)を使用。
+自動refresh機能は廃止し、Meta Business Suite 経由での手動ローテーション運用に統一した
+（データセンターIPからの自動化アクティビティ違反リスク回避のため）。
 """
 import argparse
 import logging
@@ -15,24 +18,12 @@ from dotenv import load_dotenv
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 load_dotenv()
 
-from utils.instagram import refresh_long_lived_token, whoami
+from utils.instagram import whoami
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--refresh", action="store_true", help="長期トークンを60日延長する")
-    args = parser.parse_args()
-
-    if args.refresh:
-        print("長期トークンをリフレッシュ中...")
-        result = refresh_long_lived_token()
-        new_token = result.get("access_token")
-        expires_in = result.get("expires_in")
-        days = expires_in // 86400 if expires_in else "?"
-        print(f"\n✅ リフレッシュ成功！有効期限: 約{days}日")
-        print(f"\n新しいトークン:\n{new_token}")
-        print("\n→ .env の IG_ACCESS_TOKEN を上記の値に更新してください")
-        return
+    parser.parse_args()
 
     print("トークン検証中...")
     info = whoami()

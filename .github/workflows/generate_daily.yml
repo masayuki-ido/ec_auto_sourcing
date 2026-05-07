@@ -58,17 +58,15 @@ jobs:
           DATE_JST=$(TZ=Asia/Tokyo date +%Y-%m-%d)
           PREVIEW_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/data/instagram/covers/${ITEM_ID}.jpg"
           NEXT_JSON_URL="https://github.com/${{ github.repository }}/blob/main/data/instagram/next_post.json"
-          POST_RUN_URL="https://github.com/${{ github.repository }}/actions/workflows/instagram_daily_post.yml"
           REGEN_URL="https://github.com/${{ github.repository }}/actions/workflows/generate_daily.yml"
 
           CAPTION=$(python -c "import json; print(json.load(open('data/instagram/next_post.json'))['caption'])")
 
           gh issue create \
             --title "📸 ${DATE_JST} の投稿候補 (item ${ITEM_ID})" \
-            --body "$(printf '## 表紙\n![cover](%s)\n\n## キャプション\n```\n%s\n```\n\n## 投稿する\n👉 [Actions の Instagram Daily Post を Run workflow](%s)\n\n## 候補を作り直す\n👉 [Actions の Generate Daily Post Candidate を Re-run](%s)\n\n## 詳細\n- [next_post.json](%s)\n- 自動生成: %s\n' \
+            --body "$(printf '## 表紙\n![cover](%s)\n\n## キャプション\n```\n%s\n```\n\n## 投稿する (ローカルから実行)\n```\ncd ~/Desktop/ec_auto_sourcing && git pull\npython post_to_instagram.py --dry-run   # 内容確認\npython post_to_instagram.py              # 実投稿\n```\n\n## 候補を作り直す\n👉 [Actions の Generate Daily Post Candidate を Re-run](%s)\n\n## 詳細\n- [next_post.json](%s)\n- 自動生成: %s\n' \
               "$PREVIEW_URL" \
               "$CAPTION" \
-              "$POST_RUN_URL" \
               "$REGEN_URL" \
               "$NEXT_JSON_URL" \
               "$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M JST')")"

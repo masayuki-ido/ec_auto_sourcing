@@ -2,10 +2,15 @@
 Instagram Graph API ユーティリティ
 
 主な機能:
-  - アクセストークンの動作確認 / 有効期限取得
-  - 長期トークンへの更新（リフレッシュ）
+  - アクセストークンの動作確認
   - 画像投稿（単一画像 / カルーセル）
   - 過去投稿のインサイト取得
+
+トークン運用方針:
+  IG_ACCESS_TOKEN は graph.instagram.com 系の長期ユーザートークン(60日)を使用する。
+  自動refresh(ig_refresh_token のスクリプト呼び出し)は廃止。データセンターIPからの
+  自動化シグナル化を避けるため、Meta Business Suite 経由で **手動ローテーション** する運用に
+  統一する。期限が近づいたら check_instagram.py で残日数を確認し、新トークンを再発行 → .env を上書き。
 """
 from __future__ import annotations
 
@@ -20,7 +25,6 @@ logger = logging.getLogger(__name__)
 
 GRAPH_API_VERSION = "v21.0"
 GRAPH_BASE = f"https://graph.instagram.com/{GRAPH_API_VERSION}"
-GRAPH_ROOT = "https://graph.instagram.com"
 
 
 def _token() -> str:
@@ -37,26 +41,28 @@ def _user_id() -> str:
     return user_id
 
 
+def _validate_image_url(image_url: str) -> None:
+    """publish前に画像URLが有効(200 + Content-Type: image/*)か確認。
+    無効なURLでメディアコンテナ作成を試みると Meta側でエラーが発生し、
+    繰り返されると自動化アクティビティ判定の材料になり得るため事前チェックする。
+    """
+    try:
+        res = requests.head(image_url, timeout=15, allow_redirects=True)
+    except requests.RequestException as e:
+        raise RuntimeError(f"画像URLにアクセスできません: {image_url} ({e})")
+    if res.status_code != 200:
+        raise RuntimeError(f"画像URLが {res.status_code} を返しました: {image_url}")
+    ctype = res.headers.get("content-type", "")
+    if not ctype.startswith("image/"):
+        raise RuntimeError(f"画像URLのContent-Typeが画像ではありません ({ctype}): {image_url}")
+
+
 def whoami() -> dict[str, Any]:
     """トークンの所有者情報を取得して動作確認"""
     res = requests.get(
         f"{GRAPH_BASE}/me",
         params={
             "fields": "id,username,account_type",
-            "access_token": _token(),
-        },
-        timeout=30,
-    )
-    res.raise_for_status()
-    return res.json()
-
-
-def refresh_long_lived_token() -> dict[str, Any]:
-    """長期トークンを更新（60日延長）。長期トークンは発行から24時間以上経過後にリフレッシュ可能"""
-    res = requests.get(
-        f"{GRAPH_ROOT}/refresh_access_token",
-        params={
-            "grant_type": "ig_refresh_token",
             "access_token": _token(),
         },
         timeout=30,
@@ -74,6 +80,8 @@ def publish_image(image_url: str, caption: str) -> str:
     """
     user_id = _user_id()
     token = _token()
+
+    _validate_image_url(image_url)
 
     # 1. メディアコンテナ作成
     create_res = requests.post(
@@ -114,6 +122,9 @@ def publish_carousel(image_urls: list[str], caption: str) -> str:
 
     user_id = _user_id()
     token = _token()
+
+    for url in image_urls:
+        _validate_image_url(url)
 
     # 各画像を子コンテナとして作成
     children_ids = []
