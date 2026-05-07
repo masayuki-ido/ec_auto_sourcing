@@ -202,12 +202,12 @@ def make_cover(
         cover_left = parts[0] if parts else ""
         cover_right = parts[1] if len(parts) > 1 else ""
 
-    vert_font = _font(96)
-    # 左右の縦書きを中央寄りに(端から160pxの位置)
+    vert_font = _font(90)
+    # 左右の縦書きをかなり中央寄りに(端から220pxの位置)
     if cover_left:
-        _draw_vertical(draw, x=160, text=cover_left, font=vert_font, canvas_h=CANVAS)
+        _draw_vertical(draw, x=220, text=cover_left, font=vert_font, canvas_h=CANVAS)
     if cover_right:
-        _draw_vertical(draw, x=CANVAS - 160, text=cover_right, font=vert_font, canvas_h=CANVAS)
+        _draw_vertical(draw, x=CANVAS - 220, text=cover_right, font=vert_font, canvas_h=CANVAS)
 
     # ─── 下部 価格バッジ ────────────
     if price:
