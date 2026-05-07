@@ -44,6 +44,22 @@ def load_next_post() -> dict:
     return json.loads(NEXT_POST_PATH.read_text(encoding="utf-8"))
 
 
+def already_posted_item_ids() -> set[str]:
+    """data/instagram/posted/ に保存済みの item_id を集める"""
+    if not POSTED_DIR.exists():
+        return set()
+    ids: set[str] = set()
+    for f in POSTED_DIR.glob("*.json"):
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            iid = str(d.get("item_id") or "")
+            if iid:
+                ids.add(iid)
+        except Exception:
+            pass
+    return ids
+
+
 def save_posted(post: dict, media_id: str) -> Path:
     POSTED_DIR.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -60,14 +76,27 @@ def save_posted(post: dict, media_id: str) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="投稿せず内容を表示")
+    parser.add_argument("--force", action="store_true", help="同じ item_id が既に投稿済みでも投稿する")
     args = parser.parse_args()
 
     post = load_next_post()
     media_type = post.get("media_type", "single")
     caption = post.get("caption", "").strip()
+    item_id = str(post.get("item_id") or "")
 
-    logger.info(f"投稿タイプ: {media_type}")
+    logger.info(f"投稿タイプ: {media_type} / item_id: {item_id or '不明'}")
     logger.info(f"キャプション:\n{caption}")
+
+    # 重複ガード: 既に同じ item_id を投稿済みなら拒否
+    if item_id and not args.force:
+        posted_ids = already_posted_item_ids()
+        if item_id in posted_ids:
+            logger.error(
+                f"item_id={item_id} はすでに投稿済みです。"
+                f"投稿内容を更新するため `python generate_next_post.py` を実行してください。"
+                f"強制投稿する場合は --force を指定。"
+            )
+            sys.exit(2)
 
     if media_type == "single":
         image_url = post.get("image_url")

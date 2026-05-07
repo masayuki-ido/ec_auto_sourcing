@@ -1,10 +1,9 @@
 name: Instagram Daily Post
 
 on:
-  schedule:
-    # JST 12:00 = UTC 03:00
-    - cron: "0 3 * * *"
-  workflow_dispatch:  # 手動実行用ボタン
+  # 自動実行は停止中(2026-05-07〜)。投稿は workflow_dispatch で手動トリガー。
+  # 再開する場合は schedule: 配下の cron を有効化する。
+  workflow_dispatch:
 
 permissions:
   contents: write  # 投稿履歴をコミットするため
