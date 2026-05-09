@@ -8,3 +8,6 @@ added_products.json
 *.png
 *.jpg
 !data/instagram/covers/*.jpg
+
+# リール動画(テスト出力含む。生成物なのでgit管理外)
+data/instagram/reels/
