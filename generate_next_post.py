@@ -53,6 +53,10 @@ NEXT_POST_PATH = ROOT / "data" / "instagram" / "next_post.json"
 POSTED_ITEMS_PATH = ROOT / "data" / "instagram" / "posted_items.json"
 COVERS_DIR = ROOT / "data" / "instagram" / "covers"
 PREVIEW_DIR = ROOT / "logs" / "instagram_preview"
+# 過去キャプション履歴(同パターン・同フック繰り返しを避けるためClaudeへの参考として渡す)
+CAPTION_HISTORY_PATH = ROOT / "data" / "instagram" / "caption_history.json"
+MAX_HISTORY_RECORDS = 20         # ファイルに残す件数
+HISTORY_SAMPLES_FOR_PROMPT = 5   # プロンプトに渡す直近件数
 
 # 表紙画像をホスティングする raw.githubusercontent.com のベースURL
 GITHUB_RAW_BASE = os.getenv(
@@ -63,33 +67,39 @@ GITHUB_RAW_BASE = os.getenv(
 MODEL = "claude-sonnet-4-6"
 MAX_CAROUSEL_IMAGES = 5
 MIN_IMAGES_REQUIRED = 3
-# Metaのスパム/自動化検知を避けるためハッシュタグは15個までに制限
-MAX_HASHTAGS = 15
+# ハッシュタグは5個までに制限(同系統タグ偏重・スパム検知回避)
+MAX_HASHTAGS = 5
 
-# 必ず全投稿に付与するベースハッシュタグ(順序維持で先頭側に並ぶ)
+# 必ず全投稿に付与するベースハッシュタグ(ブランド認知のための1個のみ)
 BASE_HASHTAGS = [
     "#サコッシュ",
-    "#サコッシュコーデ",
-    "#サコッシュショルダー",
-    "#サコッシュハンドメイド",
 ]
 
 # Claude が商品ごとに「ここから優先して選ぶ」キュレーションプール。
-# サコッシュ関連の検索流入を最大化するため、#サコッシュ系タグに絞った構成。
+# サコッシュ系に偏らないよう、素材・シーン・ライフスタイル・コーデ系を横断的に用意。
 CURATED_HASHTAG_POOL = {
-    "商品形態(表記揺れ含む)": [
-        "#サコッシュバッグ", "#サコッシュバック", "#サコッシュショルダーバッグ",
-        "#サコッシュポーチ", "#サコッシュミニ",
+    "形状/用途": [
+        "#ショルダーバッグ", "#斜めがけバッグ", "#クロスボディバッグ",
+        "#ミニショルダー", "#コンパクトバッグ",
     ],
-    "ディテール": [
-        "#サコッシュベルト", "#サコッシュストラップ",
+    "素材": [
+        "#帆布バッグ", "#キャンバスバッグ", "#ナイロンバッグ",
+        "#レザーバッグ", "#本革バッグ", "#撥水バッグ", "#メッシュバッグ",
     ],
-    "コミュニティ/エンゲージ系": [
-        "#サコッシュ好きと繋がりたい", "#サコッシュバッグ好きな人と繋がりたい",
-        "#サコッシュを広げ隊",
+    "シーン": [
+        "#お出かけコーデ", "#休日コーデ", "#散歩コーデ", "#旅行コーデ",
+        "#通勤コーデ", "#フェスコーデ", "#ライブコーデ",
     ],
-    "アクション系": [
-        "#サコッシュデビュー", "#サコッシュゲット",
+    "コーデ/スタイル": [
+        "#カジュアルコーデ", "#大人カジュアル", "#シンプルコーデ",
+        "#ナチュラルコーデ", "#プチプラコーデ", "#きれいめカジュアル",
+    ],
+    "ライフスタイル": [
+        "#暮らしを楽しむ", "#シンプルライフ", "#一人時間",
+        "#身軽に暮らす", "#今日の相棒",
+    ],
+    "サコッシュ系(使う場合は1個まで)": [
+        "#サコッシュコーデ", "#サコッシュバッグ", "#サコッシュショルダー",
     ],
 }
 
@@ -108,35 +118,33 @@ CAPTION_SYSTEM = """あなたはサコッシュ・ショルダーバッグ専門
 新着・人気商品を紹介する投稿のキャプションを作成してください。
 
 トーン: 親しみやすく上品。装飾的すぎない。読者の生活シーンが想像できる文章。
-**毎回違うフック・違う切り口**で書く。「毎日に〜」「身軽に〜」のような同じ言い回しを連発しない。
-切り口の例: 質問投げかけ / 場面描写 / ユーザーの心の声 / 数値訴求(価格・サイズ) / 比較訴求(普通のバッグとの違い) / コンセプト訴求
+**構成・トーン・絵文字の使い方を毎回変える**。テンプレ感は最大の敵で、Instagram側のスパム検知にも影響する。
 
-本文の構成 (JSON の "body" に入れる):
-1. フック (1行) — 商品の魅力を凝縮した一行コピー。絵文字は0〜2個まで。前回投稿と被らせない
-2. 空行
-3. ベネフィット (3行) — 特徴ではなく「ユーザーの生活でどう嬉しいか」を3行で。視点を1行ずつ変える(機能/コーデ/シーン)
-4. 空行
-5. スペックブロック — 以下の形式で商品情報を箇条書き
-   ──────────
-   📐 サイズ: <寸法を読みやすく整形。例「W22 × H14.5 × D3cm / ストラップ140cm」>
-   🎨 カラー: <カンマ区切りを「・」で区切り直す>
-   🧵 素材: <商品説明から素材名を抽出。原文表記そのまま>
-   💴 価格: ¥<価格を3桁カンマ区切り>
-   ──────────
-6. 空行
-7. CTA (1〜2行) — 必ず @sacoche_sacolla を含めて誘導する。
-   例: 「詳細は @sacoche_sacolla のプロフィールリンクから」
-       「他カラーや新作は @sacoche_sacolla をチェック」
-   @sacoche_sacolla はIG上でタップするとプロフィールに飛べるので必須。
+## 切り口を毎回変える(直近投稿のサンプルを参照して、同じ切り口を連続させない)
+切り口の例:
+- 質問投げかけ:「最近、バッグの中身、増えてませんか?」
+- 場面描写:「コンビニまでの5分。手が空いてる安心感。」
+- ユーザーの心の声:「軽さって、こんなに大事だったんだ。」
+- 数値・サイズ訴求:「160g。卵3個分の重さで、丸一日。」
+- 比較訴求:「普通のバッグより一回り小さい、でも入る。」
+- コンセプト訴求:「持つほどに肩になじむ一枚。」
+- 季節・天気訴求:「梅雨入り前に、撥水を一つ。」
 
-厳守事項:
-- 素材名・色名・カテゴリ名は商品情報の表記を1文字も変えずに使うこと(「ナイロン」を「ナイロム」など絶対NG)
+## 本文の構成ルール
+- **長さ: 4〜8行(短め推奨)**。長文は読まれない。
+- 構成は毎回変える。「フック → ベネフィット3行 → スペック → CTA」のような固定型は禁止。
+- スペック情報(サイズ・色・素材・価格)は **入れる/入れない/部分的に入れる** を毎回変える。
+- スペックを入れる場合、フォーマットも毎回変える(本文中に自然に組み込む / 1行にまとめる / 箇条書き / カンマ区切り 等)。
+- **絶対に使わない**: `──────────` のような枠線、固定の絵文字テンプレ(📐🎨🧵💴を毎回4セット並べる等)。
+- 直近投稿サンプルが渡される場合、それらと **冒頭1行・全体構成・絵文字の数と種類が必ず違う** ようにする。
+
+## 厳守事項(変えてはいけないこと)
+- 素材名・色名・カテゴリ名は商品情報の表記を1文字も変えずに使う(「ナイロン」を「ナイロム」など絶対NG)
 - サイズは商品情報に記載された数値のみ使う。書いてない数値を捏造しない
-- サイズが「記載なし」の場合は「📐 サイズ: お問い合わせください」と書く
+- サイズが「記載なし」の場合は本文中に書かない、または「サイズ詳細はプロフィールリンクから」のような誘導
 - カラーが1色しかない商品で「全N色」と書かない
-- **カラーが3色以上ある商品は、本文中(ベネフィット or CTA付近)で「カラー豊富」「全N色展開」「N色から選べる」など色数の訴求を必ず入れる**
-- 商品説明に書かれていない機能・素材・特徴を勝手に追加しない
-- CTAには必ず @sacoche_sacolla を1回入れる(タップ可能な誘導リンクとして機能する)
+- 商品説明に書かれていない機能・素材・特徴を勝手に追加しない(機能訴求は商品データに基づく事実のみ)
+- CTAには必ず @sacoche_sacolla を1回入れる(タップ可能な誘導リンク)
 
 出力は JSON 1個のみ。マークダウンや前置き禁止。"""
 
@@ -155,9 +163,11 @@ CAPTION_USER_TEMPLATE = """以下の商品からキャプションを作成し�
 追加説明(機能・素材詳細):
 {additional}
 
+{recent_history}
+
 出力JSONフォーマット:
 {{
-  "body": "<本文。改行は \\n。フック/空行/ベネフィット3行/空行/スペックブロック/空行/CTA の構成>",
+  "body": "<本文。改行は \\n。4〜8行で簡潔に。構成は毎回変える(固定テンプレ禁止)>",
   "hashtags": ["#xxx", "#yyy", ...],
   "cover_top": "<表紙上部の【】内に入る訴求文(8〜15文字目安)。商品の最大の強みを言い切る。例: コンパクトなのに収納抜群 / 通勤バッグの新定番 / 軽さは正義 / 旅にも普段にも / プチプラで大人見え>",
   "cover_left": "<表紙左側の縦書き(4〜7文字)。商品の特徴・形容を表す短文。例: 軽いコンパクト / 上質レザー / 撥水ナイロン / シンプル美人>",
@@ -165,11 +175,13 @@ CAPTION_USER_TEMPLATE = """以下の商品からキャプションを作成し�
 }}
 
 hashtagsの選び方(重要):
-- **以下のキュレーションプールから商品に合うものだけを抜粋すること**(サコッシュ系の検索流入狙い)
+- **以下のキュレーションプールから幅広く、ジャンルを散らして** 選ぶ
   {curated_pool}
-- 上記プールから商品形状・特徴に合うものを **8〜10個** 選ぶ
+- 個数: **3〜4個**(ベースタグ {base_tags} と合算して5個以内になるよう調整)
+- 同じカテゴリ(例: 形状/用途)から複数選ばない。素材・シーン・コーデ・ライフスタイルから散らす
+- サコッシュ系タグは使うとしても1個まで(検索流入は #サコッシュ 単体に任せる)
 - 自作タグは追加しない(プールにあるタグのみ使用)
-- 以下のベースタグは出力に含めないでください(後段で自動付与): {base_tags}
+- ベースタグ {base_tags} は出力に含めない(後段で自動付与)
 
 cover_* の制約:
 - cover_top は 【】で囲まれて表示されるので、それ自体には 【】 を含めない。**毎回違う訴求**にする
@@ -201,6 +213,66 @@ def save_posted_items(item_ids: set[str]) -> None:
     POSTED_ITEMS_PATH.write_text(
         json.dumps(sorted(item_ids, key=lambda x: int(x)), ensure_ascii=False, indent=2),
         encoding="utf-8",
+    )
+
+
+def load_caption_history() -> list[dict]:
+    """直近のキャプション履歴を取得。
+    初回(ファイル無し)は data/instagram/posted/*.json から自動シードする。"""
+    if CAPTION_HISTORY_PATH.exists():
+        return json.loads(CAPTION_HISTORY_PATH.read_text(encoding="utf-8"))
+    history: list[dict] = []
+    posted_dir = ROOT / "data" / "instagram" / "posted"
+    if posted_dir.exists():
+        for f in sorted(posted_dir.glob("*.json")):
+            try:
+                d = json.loads(f.read_text(encoding="utf-8"))
+                history.append({
+                    "saved_at": d.get("posted_at", ""),
+                    "item_id": str(d.get("item_id", "")),
+                    "caption": d.get("caption", ""),
+                })
+            except Exception:
+                pass
+    return history
+
+
+def append_caption_history(item_id: str, caption: str) -> None:
+    """新しいキャプションを履歴に追加し、最新 MAX_HISTORY_RECORDS 件を保持。"""
+    history = load_caption_history()
+    history.append({
+        "saved_at": datetime.now().isoformat(),
+        "item_id": str(item_id),
+        "caption": caption,
+    })
+    history = history[-MAX_HISTORY_RECORDS:]
+    CAPTION_HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CAPTION_HISTORY_PATH.write_text(
+        json.dumps(history, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def build_recent_history_section() -> str:
+    """プロンプトに差し込む「直近投稿サンプル」セクションを構築。"""
+    history = load_caption_history()
+    if not history:
+        return ""
+    samples = history[-HISTORY_SAMPLES_FOR_PROMPT:]
+    blocks = []
+    for h in samples:
+        cap = (h.get("caption") or "").strip()
+        if not cap:
+            continue
+        # ハッシュタグ行は冗長なので分離して本文だけ提示
+        body_only = cap.split("\n\n#")[0].strip()
+        blocks.append(f"--- 過去投稿 (item {h.get('item_id', '?')}) ---\n{body_only}")
+    if not blocks:
+        return ""
+    joined = "\n\n".join(blocks)
+    return (
+        "## 直近投稿サンプル(これらと冒頭1行・全体構成・絵文字の使い方が必ず違うようにする)\n"
+        f"{joined}\n"
     )
 
 
@@ -320,6 +392,7 @@ def generate_caption(product: dict) -> dict:
         additional=(product.get("additional_description") or "")[:800],
         base_tags=", ".join(BASE_HASHTAGS),
         curated_pool=pool_str,
+        recent_history=build_recent_history_section(),
     )
 
     res = client.messages.create(
@@ -559,6 +632,8 @@ def main() -> None:
         posted.add(product["item_id"])
         save_posted_items(posted)
         logger.info(f"posted_items.json 更新 ({len(posted)}件)")
+        append_caption_history(product["item_id"], post["caption"])
+        logger.info("caption_history.json に追加")
 
 
 if __name__ == "__main__":
