@@ -1,10 +1,17 @@
 {
-  "item_id": "102",
-  "caption": "125g。それだけで、一日が身軽になる。\n\nナイロン素材で防水性があるから、\n急な雨でも慌てなくていい。\nフロントのジッパーポケットに小物を分けておけば、\n出し入れもスムーズ。\n\nグリーン・オフホワイト・ブラック・イエロー、¥3,720。\n詳細は @sacoche_sacolla プロフィールリンクから 🌿\n\n#サコッシュ #ナイロンバッグ #お出かけコーデ #プチプラコーデ #身軽に暮らす",
-  "cover_top": "125gで一日を身軽に",
+  "item_id": "168",
+  "caption": "財布、スマホ、500mlボトル——\n全部入って、まだ余裕がある。\n\n高さ17cm、幅26cm、底の厚さ約7cm。\nナイロン素材だから軽くて、毎日使っても型崩れしにくい。\n\nストラップは130cmまで調整できるので\n斜め掛けでも、その日の服装に合わせて変えられる。\n\nブラック・迷彩（青)・迷彩（緑）、¥3,840。\n@sacoche_sacolla プロフィールリンクから 🎒\n\n#サコッシュ #ナイロンバッグ #お出かけコーデ #身軽に暮らす #カジュアルコーデ",
+  "cover_top": "街にもアウトドアにも使える",
   "cover_left": "軽量ナイロン",
   "cover_right": "サコッシュ",
-  "media_type": "single",
-  "image_url": "",
-  "image_urls": []
+  "media_type": "carousel",
+  "image_urls": [
+    "https://raw.githubusercontent.com/masayuki-ido/ec_auto_sourcing/main/data/instagram/covers/168.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/8263941f78a14d7589ec0eb74e67f620.jepg",
+    "https://fulmo-img-server.com/sacoche-sacolla/1b098f0b9aa24a3ca4443d228ed621cc.jepg",
+    "https://fulmo-img-server.com/sacoche-sacolla/6fc73b7926d340cab42226f26da35586.jepg",
+    "https://fulmo-img-server.com/sacoche-sacolla/42afd5c9df204235b5083449cda47c2f.jepg",
+    "https://fulmo-img-server.com/sacoche-sacolla/24bf613734f44128aeafd87faa7c5cb9.jepg"
+  ],
+  "image_url": ""
 }
