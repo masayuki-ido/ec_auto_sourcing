@@ -1,10 +1,17 @@
 {
-  "item_id": "321",
-  "caption": "120g、ほぼ手ぶらと変わらない感覚。\n\nスマホとお財布さえあれば、もう出られる。\nそんな日の相棒に選びたい、22 × 15 × 8cm のミニサコッシュ。\n\nホワイト・ブラック・ブルー・イエロー、4色。¥3,160\n詳細は @sacoche_sacolla のプロフィールリンクから 🤍\n\n#サコッシュ #ナイロンバッグ #散歩コーデ #シンプルコーデ #身軽に暮らす",
-  "cover_top": "120gで身軽にお出かけ",
-  "cover_left": "軽量ナイロン",
+  "item_id": "281",
+  "caption": "いいバッグって、持ち主を選ばないんだと思う。\n\nどんなコーデに合わせても浮かない、でも確かに目を引く。\nこの合皮レザーのサコッシュが、そういう一枚。\n\n高さ28cm、長さ31cm。A4も、iPadも、14インチのノートPCだって収まる。\nコンパクトに見えて、ちゃんと頼れる。\n\n¥15,800 / 詳細・ご購入は @sacoche_sacolla のプロフィールリンクから\n\n#サコッシュ #レザーバッグ #きれいめカジュアル #お出かけコーデ #身軽に暮らす",
+  "cover_top": "小さく見えて、全部入る",
+  "cover_left": "上質合皮レザー",
   "cover_right": "サコッシュ",
-  "media_type": "single",
-  "image_url": "",
-  "image_urls": []
+  "media_type": "carousel",
+  "image_urls": [
+    "https://raw.githubusercontent.com/masayuki-ido/ec_auto_sourcing/main/data/instagram/covers/281.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/b7c87538-678c-444a-a198-0c6c14c69b09.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/9be8057e-2334-434e-afb5-6a4234d38515.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/bc768209-562f-495e-8760-d50adc2ba183.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/fab3348c-69c8-4f53-872d-cb7740c95a77.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/766a5f94-c698-40c2-aa62-ae515c15ef75.jpg"
+  ],
+  "image_url": ""
 }
