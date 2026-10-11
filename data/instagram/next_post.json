@@ -1,10 +1,17 @@
 {
-  "item_id": "328",
-  "caption": "タブレットを持ち歩く日って、意外とかさばりがち。\n\nこのサコッシュは11インチまで対応しながら、\n27 × 20 × 4.5cmにきれいにまとまってる。\nコーデュラナイロンだから傷みにくく、磁気式ロックで\n出し入れもスムーズ。300gはもう、ストレスのない重さ。\n\nブラック、¥16,600\n詳細は @sacoche_sacolla のプロフィールリンクから\n\n#サコッシュ #ナイロンバッグ #通勤コーデ #身軽に暮らす #きれいめカジュアル",
-  "cover_top": "タブレットもすっぽり入る",
-  "cover_left": "コーデュラナイロン",
+  "item_id": "361",
+  "caption": "水筒、ちゃんと専用の場所に入れたかった。\n\nサイドの専用ポケットに収めれば、バッグの中が散らかならない。\n14 × 6 × 19cm のコンパクトさで、スマホも財布も一緒に。\nナイロン素材だから、汚れても気にせず使える。\n\nブラック・グリーン・オレンジ・ホワイトの4色、¥5,740\n詳細は @sacoche_sacolla のプロフィールリンクから 🧃\n\n#サコッシュ #ナイロンバッグ #お出かけコーデ #身軽に暮らす #サコッシュコーデ",
+  "cover_top": "水筒も小物もきれいに収まる",
+  "cover_left": "アウトドア仕様",
   "cover_right": "サコッシュ",
-  "media_type": "single",
-  "image_url": "",
-  "image_urls": []
+  "media_type": "carousel",
+  "image_urls": [
+    "https://raw.githubusercontent.com/masayuki-ido/ec_auto_sourcing/main/data/instagram/covers/361.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/5a439e9b-561e-4fb5-86c7-7b85b3b13fc6.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/4f679d5e-2402-46a8-b056-7fd32754a907.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/2a05ba82-b70e-4594-87a4-b2ecbac8fabf.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/29b1ecb4-3514-4c32-99a0-bb7b5bf9ba0f.jpg",
+    "https://fulmo-img-server.com/sacoche-sacolla/5c00c7ae-2881-440e-ac5e-f2d72e50bd13.jpg"
+  ],
+  "image_url": ""
 }
