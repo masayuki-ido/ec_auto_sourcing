@@ -1,17 +1,10 @@
 {
-  "item_id": "404",
-  "caption": "水筒を「外に出す」って、こんなに楽だったのか。\n\nサイドのホルダーに500mlをそのまま差して、\nメインにスマホ。それだけで準備完了。\n防水だから雨の日も気にしない。\n\n幅24 × 高さ28cm、カーキ・グリーン・ブルー・ブラック、¥3,720\n詳細は @sacoche_sacolla のプロフィールリンクから 💧\n\n#サコッシュ #撥水バッグ #お出かけコーデ #身軽に暮らす #カジュアルコーデ",
-  "cover_top": "水筒もスマホも、外に出す",
-  "cover_left": "防水多機能",
+  "item_id": "406",
+  "caption": "ボトルを「外に出す」か「中にしまう」か、もう迷わなくていい。\n\nサイドポケットに差して、メインにスマホと財布。\n防水ナイロンだから、雨が降り出しても走れる。\n150g、16 × 6 × 高さ18cm。\n\nブラック・ホワイト・レッド・イエロー・ブルーの5色、¥3,300\n詳細は @sacoche_sacolla のプロフィールリンクから ☔\n\n#サコッシュ #ナイロンバッグ #お出かけコーデ #身軽に暮らす #カジュアルコーデ",
+  "cover_top": "防水＆ボトルポケット付き",
+  "cover_left": "軽量防水ナイロン",
   "cover_right": "サコッシュ",
-  "media_type": "carousel",
-  "image_urls": [
-    "https://raw.githubusercontent.com/masayuki-ido/ec_auto_sourcing/main/data/instagram/covers/404.jpg",
-    "https://fulmo-img-server.com/sacoche-sacolla/e6ca71e1-bca6-4578-a157-4989fc1103de.jpg",
-    "https://fulmo-img-server.com/sacoche-sacolla/039a9b78-b19c-4705-84b3-dc62e2f6ad08.jpg",
-    "https://fulmo-img-server.com/sacoche-sacolla/8faeb8f2-e415-4faa-a148-08cb08e44c09.jpg",
-    "https://fulmo-img-server.com/sacoche-sacolla/81830231-9f53-4d32-9987-31cf38348155.jpg",
-    "https://fulmo-img-server.com/sacoche-sacolla/31f08d3f-2cc0-45cb-a427-e92c7ac334aa.jpg"
-  ],
-  "image_url": ""
+  "media_type": "single",
+  "image_url": "",
+  "image_urls": []
 }
